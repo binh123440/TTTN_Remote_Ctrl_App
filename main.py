@@ -71,3 +71,22 @@ def reset_password(request: schemas.ResetPasswordConfirm, db: Session = Depends(
 
     updated_user = crud.update_password(db, user, request.new_password)
     return {"message": "Mật khẩu đã được cập nhật thành công!"}
+
+@app.post("/device/add")
+def add_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
+    existing_device = crud.get_device_by_ip(db, device.ip_address)
+    if existing_device:
+        raise HTTPException(status_code=400, detail="Device already exists.")
+    new_device = crud.add_device(
+        db=db,
+        name=device.name,
+        ip_address=device.ip_address,
+        port=device.port,
+        connection_type=device.connection_type,
+        username=device.username,
+        password=device.password,
+        private_key=device.private_key,
+        owner_id=device.owner_id
+    )
+    return {"message": "Device added successfully", "device": new_device}
+    

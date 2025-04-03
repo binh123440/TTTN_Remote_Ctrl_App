@@ -29,3 +29,27 @@ def update_password(db: Session, user: User, new_password: str):
     db.commit()
     db.refresh(user)
     return user
+
+def get_device_by_ip(db: Session, ip_address: str):
+    device = db.query(Device).filter(Device.ip_address == ip_address).first()
+    if not device:
+        raise ValueError("Device not found")
+    return device
+
+def add_device(db: Session, name: str, ip_address: str, port: int, connection_type: str, username: str, password: str = None, private_key: str = None, owner_id: int = None):
+    new_device = Device(
+        name=name,
+        ip_address=ip_address,
+        port=port,
+        connection_type=connection_type,
+        username=username,
+        password=password,
+        private_key=private_key,
+        owner_id=owner_id
+    )
+    db.add(new_device)
+    db.commit()
+    db.refresh(new_device)
+    
+    return new_device
+ 
