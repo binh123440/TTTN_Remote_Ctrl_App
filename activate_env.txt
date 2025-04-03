@@ -1,0 +1,13 @@
+# Create a virtual environment
+python -m venv env
+
+# Activate the virtual environment
+env\Scripts\activate # For Windows
+
+source env/bin/activate  # For Linux or MacOS
+
+# Run command
+uvicorn main:app --reload
+
+# Address Program's Run
+http://127.0.0.1:8000/docs
