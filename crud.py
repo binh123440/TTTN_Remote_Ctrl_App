@@ -1,5 +1,7 @@
+import json
+from typing import List  # Thêm dòng này
 from sqlalchemy.orm import Session
-from models import User
+from models import User, CommandList, Profile
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -29,3 +31,35 @@ def update_password(db: Session, user: User, new_password: str):
     db.commit()
     db.refresh(user)
     return user
+
+# CRUD cho CommandList
+def get_command_list_by_name(db: Session, name: str):
+    return db.query(CommandList).filter(CommandList.name == name).first()
+
+def get_command_list(db: Session, command_list_id: int):
+    return db.query(CommandList).filter(CommandList.id == command_list_id).first()
+
+def create_command_list(db: Session, name: str, commands: List[str]):
+    db_command_list = CommandList(
+        name=name,
+        commands=json.dumps(commands)
+    )
+    db.add(db_command_list)
+    db.commit()
+    db.refresh(db_command_list)
+    return db_command_list
+
+# CRUD cho Profile
+def get_profile_by_name(db: Session, name: str):
+    return db.query(Profile).filter(Profile.name == name).first()
+
+def create_profile(db: Session, name: str, command_list_id: int, device_group_id: int):
+    db_profile = Profile(
+        name=name,
+        command_list_id=command_list_id,
+        device_group_id=device_group_id
+    )
+    db.add(db_profile)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile

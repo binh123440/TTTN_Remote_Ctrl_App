@@ -1,11 +1,16 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+import json
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 import crud, schemas, utils
 from database import get_db
-from models import User
-
+from models import User, CommandList, Profile
 
 app = FastAPI()
+
+# Hàm để lấy user hiện tại (di chuyển lên đầu file)
+def get_current_user(db: Session = Depends(get_db)):
+    # Đây chỉ là mẫu, trong thực tế bạn sẽ lấy user từ token JWT hoặc session
+    return db.query(User).filter(User.role == "team_lead").first()
 
 @app.get("/")
 def read_root():
@@ -20,7 +25,7 @@ def get_users(db: Session = Depends(get_db)):
 @app.post("/create-user/")
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # Check if role is valid
-    if user.role not in ["manager", "engineer"]:
+    if user.role not in ["manager", "engineer","team_lead"]:
         raise HTTPException(status_code=400, detail="Invalid role. Must be 'manager' or 'engineer'.")
 
     # Check if username already exists in the database
@@ -71,3 +76,75 @@ def reset_password(request: schemas.ResetPasswordConfirm, db: Session = Depends(
 
     updated_user = crud.update_password(db, user, request.new_password)
     return {"message": "Mật khẩu đã được cập nhật thành công!"}
+
+# API cho CommandList
+@app.post("/command-lists/", response_model=schemas.CommandListResponse, status_code=status.HTTP_201_CREATED)
+def create_command_list(
+    command_list: schemas.CommandListCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Kiểm tra quyền hạn team lead
+    if current_user.role != "team_lead":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only team lead can create command lists"
+        )
+    
+    # Kiểm tra xem command list đã tồn tại chưa
+    existing = crud.get_command_list_by_name(db, command_list.name)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Command list name already exists"
+        )
+    
+    # Tạo command list mới
+    result = crud.create_command_list(db, command_list.name, command_list.commands)
+    
+    # Chuyển đổi chuỗi JSON thành danh sách Python
+    return {
+        "id": result.id,
+        "name": result.name,
+        "commands": json.loads(result.commands)
+    }
+
+# API cho Profile
+@app.post("/profiles/", response_model=schemas.ProfileResponse, status_code=status.HTTP_201_CREATED)
+def create_profile(
+    profile: schemas.ProfileCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Kiểm tra quyền hạn team lead
+    if current_user.role != "team_lead":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only team lead can create profiles"
+        )
+    
+    # Kiểm tra xem profile đã tồn tại chưa
+    existing = crud.get_profile_by_name(db, profile.name)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Profile name already exists"
+        )
+    
+    # Kiểm tra command list có tồn tại không
+    command_list = crud.get_command_list(db, profile.command_list_id)
+    if not command_list:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Command list not found"
+        )
+    
+    # Tạo profile mới
+    result = crud.create_profile(db, profile.name, profile.command_list_id, profile.device_group_id)
+    
+    return {
+        "id": result.id,
+        "name": result.name,
+        "command_list_id": result.command_list_id,
+        "device_group_id": result.device_group_id
+    }
