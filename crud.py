@@ -16,7 +16,10 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_email(db: Session, email_or_phone: str):
     # Vì không có phone_number trong model, nên chỉ check email hoặc username
     return db.query(User).filter(User.email == email_or_phone).first()
-                                 
+
+def get_user_by_email_or_phone(db: Session, email_or_phone: str):
+    return db.query(User).filter((User.email == email_or_phone) | (User.phone_number == email_or_phone)).first()
+
 def get_user_by_phone_number(db: Session, phone_number: str):
     return db.query(User).filter(User.phone_number == phone_number).first()
 
