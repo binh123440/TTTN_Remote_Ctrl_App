@@ -1,25 +1,37 @@
 import json
-from typing import List  # Thêm dòng này
+from typing import List, Optional
 from sqlalchemy.orm import Session
-from models import User, CommandList, Profile
 from passlib.context import CryptContext
+from models import User, Device, DeviceGroup, CommandList, Profile, UserProfile, Session as DbSession, Log, Reading
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def get_user_by_email_or_phone(db: Session, email_or_phone: str):
-    return db.query(User).filter((User.email == email_or_phone) | (User.phone_number == email_or_phone)).first()
+# User CRUD
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
 
 def get_user_by_username(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
 
-def create_user(db: Session, username: str, phone_number: str, email: str, password: str, role: str):
+def get_user_by_email(db: Session, email_or_phone: str):
+    # Vì không có phone_number trong model, nên chỉ check email hoặc username
+    return db.query(User).filter(User.email == email_or_phone).first()
+                                 
+def get_user_by_phone_number(db: Session, phone_number: str):
+    return db.query(User).filter(User.phone_number == phone_number).first()
+
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
+
+def create_user(db: Session, username: str, email: str, password: str, role: str, phone_number: Optional[str] = None):
+    # phone_number được bỏ qua vì không có trong model User
     hashed_password = pwd_context.hash(password)
     new_user = User(
         username=username,
-        phone_number=phone_number,
         email=email,
-        password=hashed_password,
+        password=hashed_password,  # Lưu ý tên trường là password_hash
         role=role,
+        phone_number=phone_number
     )
     db.add(new_user)
     db.commit()
@@ -27,12 +39,48 @@ def create_user(db: Session, username: str, phone_number: str, email: str, passw
     return new_user
 
 def update_password(db: Session, user: User, new_password: str):
-    user.password = pwd_context.hash(new_password)
+    user.password = pwd_context.hash(new_password) 
     db.commit()
     db.refresh(user)
     return user
 
-# CRUD cho CommandList
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
+# DeviceGroup CRUD
+def get_device_group_by_name(db: Session, group_name: str):
+    return db.query(DeviceGroup).filter(DeviceGroup.group_name == group_name).first()
+
+def get_device_group(db: Session, device_group_id: int):
+    return db.query(DeviceGroup).filter(DeviceGroup.id == device_group_id).first()
+
+def create_device_group(db: Session, group_name: str, description: Optional[str] = None):
+    db_device_group = DeviceGroup(
+        group_name=group_name,
+        description=description
+    )
+    db.add(db_device_group)
+    db.commit()
+    db.refresh(db_device_group)
+    return db_device_group
+
+# Device CRUD
+def get_device(db: Session, device_id: int):
+    return db.query(Device).filter(Device.id == device_id).first()
+
+def create_device(db: Session, ip_address: str, controlled_feature: str, device_type: str = "NodeMCU", location: Optional[str] = None):
+    db_device = Device(
+        ip_address=ip_address,
+        device_type=device_type,
+        location=location,
+        controlled_feature=controlled_feature
+    )
+    db.add(db_device)
+    db.commit()
+    db.refresh(db_device)
+    return db_device
+
+# CommandList CRUD
 def get_command_list_by_name(db: Session, name: str):
     return db.query(CommandList).filter(CommandList.name == name).first()
 
@@ -49,13 +97,17 @@ def create_command_list(db: Session, name: str, commands: List[str]):
     db.refresh(db_command_list)
     return db_command_list
 
-# CRUD cho Profile
-def get_profile_by_name(db: Session, name: str):
-    return db.query(Profile).filter(Profile.name == name).first()
+# Profile CRUD
+def get_profile_by_name(db: Session, profile_name: str):
+    return db.query(Profile).filter(Profile.name == profile_name).first()
 
-def create_profile(db: Session, name: str, command_list_id: int, device_group_id: int):
+def get_profile(db: Session, profile_id: int):
+    return db.query(Profile).filter(Profile.id == profile_id).first()
+
+def create_profile(db: Session, profile_name: str, team_lead_id: int, command_list_id: int, device_group_id: int):
     db_profile = Profile(
-        name=name,
+        name=profile_name,  # Đổi từ profile_name thành name
+        team_lead_id=team_lead_id,
         command_list_id=command_list_id,
         device_group_id=device_group_id
     )
@@ -63,3 +115,66 @@ def create_profile(db: Session, name: str, command_list_id: int, device_group_id
     db.commit()
     db.refresh(db_profile)
     return db_profile
+
+# UserProfile CRUD
+def assign_profile_to_operator(db: Session, profile_id: int, operator_id: int):
+    db_user_profile = UserProfile(
+        profile_id=profile_id,
+        operator_id=operator_id
+    )
+    db.add(db_user_profile)
+    db.commit()
+    db.refresh(db_user_profile)
+    return db_user_profile
+
+def get_operator_profiles(db: Session, operator_id: int):
+    return db.query(UserProfile).filter(UserProfile.operator_id == operator_id).all()
+
+# Session CRUD
+def create_session(db: Session, operator_id: int, device_id: int):
+    db_session = DbSession(
+        operator_id=operator_id,
+        device_id=device_id,
+        status="active"
+    )
+    db.add(db_session)
+    db.commit()
+    db.refresh(db_session)
+    return db_session
+
+def get_active_sessions(db: Session):
+    return db.query(DbSession).filter(DbSession.status == "active").all()
+
+def terminate_session(db: Session, session_id: int):
+    session = db.query(DbSession).filter(DbSession.id == session_id).first()
+    if session:
+        session.status = "killed"
+        session.ended_at = func.now()
+        db.commit()
+        db.refresh(session)
+    return session
+
+# Log CRUD
+def create_log(db: Session, user_id: int, device_id: int, command: str, result: str):
+    db_log = Log(
+        user_id=user_id,
+        device_id=device_id,
+        command=command,
+        result=result
+    )
+    db.add(db_log)
+    db.commit()
+    db.refresh(db_log)
+    return db_log
+
+# Reading CRUD
+def create_reading(db: Session, device_id: int, temperature: Optional[float] = None, humidity: Optional[float] = None):
+    db_reading = Reading(
+        device_id=device_id,
+        temperature=temperature,
+        humidity=humidity
+    )
+    db.add(db_reading)
+    db.commit()
+    db.refresh(db_reading)
+    return db_reading

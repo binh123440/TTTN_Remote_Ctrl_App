@@ -7,13 +7,13 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, nullable=False, index=True)
-    password_hash = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    email = Column(String(100), unique=True, index=True)
-    role = Column(String(100))
-
-    # Relationships
+    username = Column(String, nullable=False)
+    phone_number = Column(String, unique=True, nullable=False)
+    email = Column(String, nullable=False)
+    password = Column(String, nullable=False)  # Đổi từ password_hash thành password
+    role = Column(String, nullable=False)
+    
+    # Relationships - giữ nguyên để đảm bảo tính nhất quán
     profiles_created = relationship("Profile", back_populates="team_lead")
     assigned_profiles = relationship("UserProfile", back_populates="operator")
     sessions = relationship("Session", back_populates="operator")
@@ -77,7 +77,7 @@ class CommandList(Base):
     __tablename__ = "command_lists"
     
     id = Column(Integer, primary_key=True, index=True)
-    list_name = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False)
     commands = Column(JSONB, nullable=False)  # JSONB for PostgreSQL
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -91,7 +91,7 @@ class Profile(Base):
     team_lead_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     command_list_id = Column(Integer, ForeignKey("command_lists.id", ondelete="CASCADE"), nullable=False, index=True)
     device_group_id = Column(Integer, ForeignKey("device_groups.id", ondelete="CASCADE"), nullable=False, index=True)
-    profile_name = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False)  # Đổi từ profile_name thành name
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

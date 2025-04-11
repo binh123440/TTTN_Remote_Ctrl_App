@@ -1,6 +1,6 @@
 import json
 from pydantic import BaseModel, EmailStr
-from typing import List
+from typing import List, Optional, Union
 
 class UserCreate(BaseModel):
     username: str
@@ -44,3 +44,22 @@ class ProfileResponse(BaseModel):
 
     class Config:
         orm_mode = True
+        
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Union[str, None] = None
+    role: Union[str, None] = None
+# Thêm phần này vào file schemas.py
+
+class DeviceGroupCreate(BaseModel):
+    group_name: str
+    description: Optional[str] = None
+
+class DeviceGroupResponse(BaseModel):
+    id: int
+    group_name: str
+    description: Optional[str] = None
+    
