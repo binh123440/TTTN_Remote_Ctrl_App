@@ -335,3 +335,57 @@ def assign_profile(
     user_profile = crud.assign_profile_to_operator(db, profile_id, operator_id)
     
     return {"message": "Profile assigned successfully"}
+
+@app.post("/devices/", response_model=schemas.DeviceResponse)
+def create_device(
+    device: schemas.DeviceCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    try:
+        # Kiểm tra thiết bị đã tồn tại chưa bằng IP address
+        if crud.get_device_by_ip(db, device.ip_address):
+            raise HTTPException(status_code=400, detail="Device with this IP address already exists")
+        
+        # Kiểm tra device group tồn tại
+        device_group = crud.get_device_group(db, device.device_group_id)
+        if not device_group:
+            raise HTTPException(status_code=404, detail="Device group not found")
+        
+        # Kiểm tra device username đã tồn tại chưa
+        if crud.get_device_by_username(db, device.username):
+            raise HTTPException(status_code=400, detail="Device with this username already exists")
+        
+        # Tạo thiết bị mới
+        db_device = crud.create_device(
+            db=db,
+            ip_address=device.ip_address,
+            port=device.port,
+            connection_type=device.connection_type,
+            username=device.username,
+            password=device.password,
+            device_type=device.device_type,
+            location=device.location,
+            controlled_feature=device.controlled_feature,
+            private_key=device.private_key,
+            owner_id=current_user.id,
+            device_group_id=device.device_group_id
+        )
+        
+        return {
+            "id": db_device.id,
+            "ip_address": db_device.ip_address,
+            "port": db_device.port,
+            "connection_type": db_device.connection_type,
+            "username": db_device.username,
+            "device_type": db_device.device_type,
+            "location": db_device.location,
+            "controlled_feature": db_device.controlled_feature,
+            "device_group_id": db_device.device_group_id,
+            "owner_id": db_device.owner_id,
+            "created_at": db_device.created_at
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

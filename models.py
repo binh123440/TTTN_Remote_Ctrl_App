@@ -18,21 +18,31 @@ class User(Base):
     assigned_profiles = relationship("UserProfile", back_populates="operator")
     sessions = relationship("Session", back_populates="operator")
     logs = relationship("Log", back_populates="user")
+    devices = relationship("Device", back_populates="owner")
 
 class Device(Base):
     __tablename__ = "devices"
     
     id = Column(Integer, primary_key=True, index=True)
-    ip_address = Column(String(20), nullable=False, index=True)
-    device_type = Column(String(50), default='NodeMCU', index=True)
+    ip_address = Column(String(20), nullable=False)
+    port = Column(String(10), nullable=False)
+    connection_type = Column(String(20), nullable=False)
+    username = Column(String(50), nullable=False, unique=True)
+    password_hash = Column(Text, nullable=False)
+    device_type = Column(String(50), server_default="NodeMCU")
     location = Column(String(100))
     controlled_feature = Column(String(100), nullable=False)
+    private_key = Column(Text, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    device_group_id = Column(Integer, ForeignKey("device_groups.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
+    owner = relationship("User", back_populates="devices")
+    device_group = relationship("DeviceGroup", back_populates="devices")
+    readings = relationship("Reading", back_populates="device")
     sessions = relationship("Session", back_populates="device")
     logs = relationship("Log", back_populates="device")
-    readings = relationship("Reading", back_populates="device")
 
 class Log(Base):
     __tablename__ = "logs"
@@ -72,6 +82,7 @@ class DeviceGroup(Base):
     
     # Relationships
     profiles = relationship("Profile", back_populates="device_group")
+    devices = relationship("Device", back_populates="device_group")
 
 class CommandList(Base):
     __tablename__ = "command_lists"

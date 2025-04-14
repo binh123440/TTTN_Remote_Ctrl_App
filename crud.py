@@ -71,12 +71,46 @@ def create_device_group(db: Session, group_name: str, description: Optional[str]
 def get_device(db: Session, device_id: int):
     return db.query(Device).filter(Device.id == device_id).first()
 
-def create_device(db: Session, ip_address: str, controlled_feature: str, device_type: str = "NodeMCU", location: Optional[str] = None):
+def get_device_by_ip(db: Session, ip_address: str):
+    return db.query(Device).filter(Device.ip_address == ip_address).first()
+
+def get_device_by_username(db: Session, username: str):
+    return db.query(Device).filter(Device.username == username).first()
+
+def create_device(
+    db: Session, 
+    ip_address: str,
+    port: str,
+    connection_type: str,
+    username: str,
+    password: str,
+    device_type: str,
+    location: Optional[str],
+    controlled_feature: str,
+    private_key: str,
+    owner_id: int,
+    device_group_id: int
+):
+    # Kiểm tra nếu username đã tồn tại
+    existing_device = get_device_by_username(db, username)
+    if existing_device:
+        raise ValueError("Device with this username already exists")
+    
+    # Hash mật khẩu
+    hashed_password = pwd_context.hash(password)
+    
     db_device = Device(
         ip_address=ip_address,
+        port=port,
+        connection_type=connection_type,
+        username=username,
+        password_hash=hashed_password,
         device_type=device_type,
         location=location,
-        controlled_feature=controlled_feature
+        controlled_feature=controlled_feature,
+        private_key=private_key,
+        owner_id=owner_id,
+        device_group_id=device_group_id
     )
     db.add(db_device)
     db.commit()
