@@ -389,3 +389,232 @@ def create_device(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# Thêm vào main.py
+
+# 1. ADMIN APIS - USER MANAGEMENT
+
+@app.put("/users/{user_id}", response_model=schemas.UserResponse)
+def update_user(
+    user_id: int,
+    user_update: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_admin_user)
+):
+    # Không cho phép admin tự thay đổi role của chính mình
+    if user_id == current_user.id and user_update.role is not None:
+        raise HTTPException(status_code=400, detail="Admin cannot change their own role")
+    
+    # Cập nhật user
+    user_data = user_update.dict(exclude_unset=True)
+    updated_user = crud.update_user(db, user_id, user_data)
+    
+    if updated_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return updated_user
+
+@app.delete("/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_admin_user)
+):
+    # Không cho phép admin xóa chính mình
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Admin cannot delete their own account")
+    
+    success = crud.delete_user(db, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User deleted successfully"}
+
+# 2. TEAM LEAD APIS - DEVICE MANAGEMENT
+
+@app.put("/devices/{device_id}", response_model=schemas.DeviceResponse)
+def update_device(
+    device_id: int,
+    device_update: schemas.DeviceUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    # Kiểm tra device tồn tại
+    device = crud.get_device(db, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Nếu cập nhật username, kiểm tra xem username mới đã tồn tại chưa
+    if device_update.username and device_update.username != device.username:
+        existing_device = crud.get_device_by_username(db, device_update.username)
+        if existing_device:
+            raise HTTPException(status_code=400, detail="Device with this username already exists")
+    
+    # Nếu cập nhật IP, kiểm tra xem IP mới đã tồn tại chưa
+    if device_update.ip_address and device_update.ip_address != device.ip_address:
+        existing_device = crud.get_device_by_ip(db, device_update.ip_address)
+        if existing_device:
+            raise HTTPException(status_code=400, detail="Device with this IP address already exists")
+    
+    # Nếu cập nhật device_group_id, kiểm tra xem device group mới có tồn tại không
+    if device_update.device_group_id:
+        device_group = crud.get_device_group(db, device_update.device_group_id)
+        if not device_group:
+            raise HTTPException(status_code=404, detail="Device group not found")
+    
+    # Cập nhật device
+    device_data = device_update.dict(exclude_unset=True)
+    updated_device = crud.update_device(db, device_id, device_data)
+    
+    return updated_device
+
+@app.delete("/devices/{device_id}")
+def delete_device(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    success = crud.delete_device(db, device_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    return {"message": "Device deleted successfully"}
+
+# 3. TEAM LEAD APIS - DEVICE GROUP MANAGEMENT
+
+@app.put("/device-groups/{device_group_id}", response_model=schemas.DeviceGroupResponse)
+def update_device_group(
+    device_group_id: int,
+    device_group_update: schemas.DeviceGroupUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    # Kiểm tra device group tồn tại
+    device_group = crud.get_device_group(db, device_group_id)
+    if not device_group:
+        raise HTTPException(status_code=404, detail="Device group not found")
+    
+    # Nếu cập nhật tên, kiểm tra xem tên mới đã tồn tại chưa
+    if device_group_update.group_name and device_group_update.group_name != device_group.group_name:
+        existing_group = crud.get_device_group_by_name(db, device_group_update.group_name)
+        if existing_group:
+            raise HTTPException(status_code=400, detail="Device group with this name already exists")
+    
+    # Cập nhật device group
+    device_group_data = device_group_update.dict(exclude_unset=True)
+    updated_device_group = crud.update_device_group(db, device_group_id, device_group_data)
+    
+    return {
+        "id": updated_device_group.id,
+        "group_name": updated_device_group.group_name,
+        "description": updated_device_group.description
+    }
+
+@app.delete("/device-groups/{device_group_id}")
+def delete_device_group(
+    device_group_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    success = crud.delete_device_group(db, device_group_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Cannot delete device group. It may have devices associated with it.")
+    
+    return {"message": "Device group deleted successfully"}
+
+# 4. TEAM LEAD APIS - COMMAND LIST MANAGEMENT
+
+@app.put("/command-lists/{command_list_id}", response_model=schemas.CommandListResponse)
+def update_command_list(
+    command_list_id: int,
+    command_list_update: schemas.CommandListUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    # Kiểm tra command list tồn tại
+    command_list = crud.get_command_list(db, command_list_id)
+    if not command_list:
+        raise HTTPException(status_code=404, detail="Command list not found")
+    
+    # Nếu cập nhật tên, kiểm tra xem tên mới đã tồn tại chưa
+    if command_list_update.name and command_list_update.name != command_list.name:
+        existing_list = crud.get_command_list_by_name(db, command_list_update.name)
+        if existing_list:
+            raise HTTPException(status_code=400, detail="Command list with this name already exists")
+    
+    # Cập nhật command list
+    command_list_data = command_list_update.dict(exclude_unset=True)
+    updated_command_list = crud.update_command_list(db, command_list_id, command_list_data)
+    
+    return {
+        "id": updated_command_list.id,
+        "name": updated_command_list.name,
+        "commands": json.loads(updated_command_list.commands)
+    }
+
+@app.delete("/command-lists/{command_list_id}")
+def delete_command_list(
+    command_list_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    success = crud.delete_command_list(db, command_list_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Cannot delete command list. It may be used in profiles.")
+    
+    return {"message": "Command list deleted successfully"}
+
+# 5. TEAM LEAD APIS - PROFILE MANAGEMENT
+
+@app.put("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
+def update_profile(
+    profile_id: int,
+    profile_update: schemas.ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    # Kiểm tra profile tồn tại
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Nếu cập nhật tên, kiểm tra xem tên mới đã tồn tại chưa
+    if profile_update.name and profile_update.name != profile.name:
+        existing_profile = crud.get_profile_by_name(db, profile_update.name)
+        if existing_profile:
+            raise HTTPException(status_code=400, detail="Profile with this name already exists")
+    
+    # Nếu cập nhật command_list_id, kiểm tra xem command list mới có tồn tại không
+    if profile_update.command_list_id:
+        command_list = crud.get_command_list(db, profile_update.command_list_id)
+        if not command_list:
+            raise HTTPException(status_code=404, detail="Command list not found")
+    
+    # Nếu cập nhật device_group_id, kiểm tra xem device group mới có tồn tại không
+    if profile_update.device_group_id:
+        device_group = crud.get_device_group(db, profile_update.device_group_id)
+        if not device_group:
+            raise HTTPException(status_code=404, detail="Device group not found")
+    
+    # Cập nhật profile
+    profile_data = profile_update.dict(exclude_unset=True)
+    updated_profile = crud.update_profile(db, profile_id, profile_data)
+    
+    return {
+        "id": updated_profile.id,
+        "name": updated_profile.name,
+        "command_list_id": updated_profile.command_list_id,
+        "device_group_id": updated_profile.device_group_id
+    }
+
+@app.delete("/profiles/{profile_id}")
+def delete_profile(
+    profile_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    success = crud.delete_profile(db, profile_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    return {"message": "Profile deleted successfully"}

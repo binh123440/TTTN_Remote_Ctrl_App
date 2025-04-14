@@ -50,6 +50,30 @@ def update_password(db: Session, user: User, new_password: str):
 def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
+def update_user(db: Session, user_id: int, user_data: dict):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    
+    for key, value in user_data.items():
+        if key == "password" and value:
+            value = pwd_context.hash(value)
+        if value is not None:
+            setattr(db_user, key, value)
+    
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def delete_user(db: Session, user_id: int):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return False
+    
+    db.delete(db_user)
+    db.commit()
+    return True
+
 # DeviceGroup CRUD
 def get_device_group_by_name(db: Session, group_name: str):
     return db.query(DeviceGroup).filter(DeviceGroup.group_name == group_name).first()
@@ -66,6 +90,33 @@ def create_device_group(db: Session, group_name: str, description: Optional[str]
     db.commit()
     db.refresh(db_device_group)
     return db_device_group
+
+def update_device_group(db: Session, device_group_id: int, device_group_data: dict):
+    db_device_group = get_device_group(db, device_group_id)
+    if not db_device_group:
+        return None
+    
+    for key, value in device_group_data.items():
+        if value is not None:
+            setattr(db_device_group, key, value)
+    
+    db.commit()
+    db.refresh(db_device_group)
+    return db_device_group
+
+def delete_device_group(db: Session, device_group_id: int):
+    db_device_group = get_device_group(db, device_group_id)
+    if not db_device_group:
+        return False
+    
+    # Check if device group has devices
+    devices = db.query(Device).filter(Device.device_group_id == device_group_id).all()
+    if devices:
+        return False  # Cannot delete device group with devices
+    
+    db.delete(db_device_group)
+    db.commit()
+    return True
 
 # Device CRUD
 def get_device(db: Session, device_id: int):
@@ -117,6 +168,30 @@ def create_device(
     db.refresh(db_device)
     return db_device
 
+def update_device(db: Session, device_id: int, device_data: dict):
+    db_device = get_device(db, device_id)
+    if not db_device:
+        return None
+    
+    for key, value in device_data.items():
+        if key == "password" and value:
+            setattr(db_device, "password_hash", pwd_context.hash(value))
+        elif value is not None:
+            setattr(db_device, key, value)
+    
+    db.commit()
+    db.refresh(db_device)
+    return db_device
+
+def delete_device(db: Session, device_id: int):
+    db_device = get_device(db, device_id)
+    if not db_device:
+        return False
+    
+    db.delete(db_device)
+    db.commit()
+    return True
+
 # CommandList CRUD
 def get_command_list_by_name(db: Session, name: str):
     return db.query(CommandList).filter(CommandList.name == name).first()
@@ -133,6 +208,35 @@ def create_command_list(db: Session, name: str, commands: List[str]):
     db.commit()
     db.refresh(db_command_list)
     return db_command_list
+
+def update_command_list(db: Session, command_list_id: int, command_list_data: dict):
+    db_command_list = get_command_list(db, command_list_id)
+    if not db_command_list:
+        return None
+    
+    for key, value in command_list_data.items():
+        if key == "commands" and value is not None:
+            setattr(db_command_list, key, json.dumps(value))
+        elif value is not None:
+            setattr(db_command_list, key, value)
+    
+    db.commit()
+    db.refresh(db_command_list)
+    return db_command_list
+
+def delete_command_list(db: Session, command_list_id: int):
+    db_command_list = get_command_list(db, command_list_id)
+    if not db_command_list:
+        return False
+    
+    # Check if command list is used in profiles
+    profiles = db.query(Profile).filter(Profile.command_list_id == command_list_id).all()
+    if profiles:
+        return False  # Cannot delete command list used in profiles
+    
+    db.delete(db_command_list)
+    db.commit()
+    return True
 
 # Profile CRUD
 def get_profile_by_name(db: Session, profile_name: str):
@@ -153,6 +257,34 @@ def create_profile(db: Session, profile_name: str, team_lead_id: int, command_li
     db.refresh(db_profile)
     return db_profile
 
+def update_profile(db: Session, profile_id: int, profile_data: dict):
+    db_profile = get_profile(db, profile_id)
+    if not db_profile:
+        return None
+    
+    for key, value in profile_data.items():
+        # Handle name field differently because DB field is possibly different
+        if key == "name" and value is not None:
+            setattr(db_profile, "name", value)
+        elif value is not None:
+            setattr(db_profile, key, value)
+    
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+def delete_profile(db: Session, profile_id: int):
+    db_profile = get_profile(db, profile_id)
+    if not db_profile:
+        return False
+    
+    # First delete all assignments for this profile
+    db.query(UserProfile).filter(UserProfile.profile_id == profile_id).delete()
+    
+    db.delete(db_profile)
+    db.commit()
+    return True
+
 # UserProfile CRUD
 def assign_profile_to_operator(db: Session, profile_id: int, operator_id: int):
     db_user_profile = UserProfile(
@@ -166,6 +298,19 @@ def assign_profile_to_operator(db: Session, profile_id: int, operator_id: int):
 
 def get_operator_profiles(db: Session, operator_id: int):
     return db.query(UserProfile).filter(UserProfile.operator_id == operator_id).all()
+
+def delete_profile_assignment(db: Session, profile_id: int, operator_id: int):
+    db_user_profile = db.query(UserProfile).filter(
+        UserProfile.profile_id == profile_id,
+        UserProfile.operator_id == operator_id
+    ).first()
+    
+    if not db_user_profile:
+        return False
+    
+    db.delete(db_user_profile)
+    db.commit()
+    return True
 
 # Session CRUD
 def create_session(db: Session, operator_id: int, device_id: int):
