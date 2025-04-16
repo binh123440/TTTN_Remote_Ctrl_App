@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Union
 from jose import JWTError, jwt
 import crud, models, schemas, utils
+from fastapi.middleware.cors import CORSMiddleware
 from database import get_db, engine
 
 # Tải biến môi trường từ file .env
@@ -93,7 +94,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         if not user:
             raise HTTPException(status_code=400, detail="Incorrect username or password")
         
-        if not crud.verify_password(form_data.password, user.password):
+        if not crud.verify_password(form_data.password, user.password_hash): 
             raise HTTPException(status_code=400, detail="Incorrect username or password")
         
         # Tạo JWT token thực tế
@@ -183,6 +184,22 @@ def reset_password(request: schemas.ResetPasswordConfirm, db: Session = Depends(
 
     updated_user = crud.update_password(db, user, request.new_password)
     return {"message": "Mật khẩu đã được cập nhật thành công!"}
+
+@app.put("/users/update-password")
+def update_password(password_update: schemas.PasswordUpdate,
+                    db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+
+    # Kiểm tra mật khẩu cũ
+    if not utils.verify_password(password_update.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Mã hóa mật khẩu mới và lưu vào cơ sở dữ liệu
+    hashed_new_password = utils.hash_password(password_update.new_password)  # Sử dụng hàm hash_password
+    current_user.password_hash = hashed_new_password  # Cập nhật password_hash thay vì password
+    db.commit()
+
+    return {"message": "Password updated successfully"}
 
 # Thêm endpoint này vào file main.py
 
@@ -618,3 +635,20 @@ def delete_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     
     return {"message": "Profile deleted successfully"}
+
+
+@app.post("/logout")
+def logout(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Chỉ cần gửi phản hồi xác nhận logout thành công
+    return {"message": "Logged out successfully"}
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React chạy tại cổng 3000
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

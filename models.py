@@ -10,9 +10,13 @@ class User(Base):
     username = Column(String, nullable=False)
     phone_number = Column(String, unique=True, nullable=False)
     email = Column(String, nullable=False)
-    password = Column(String, nullable=False)  # Đổi từ password_hash thành password
+    password_hash = Column(String, nullable=False)  # Đổi từ password_password_hash thành password_hash
     role = Column(String, nullable=False)
-    
+
+    @property
+    def password_plain(self):
+        return self.password_hash  # Sử dụng password_hash thay vì password_plain
+
     # Relationships - giữ nguyên để đảm bảo tính nhất quán
     profiles_created = relationship("Profile", back_populates="team_lead")
     assigned_profiles = relationship("UserProfile", back_populates="operator")
