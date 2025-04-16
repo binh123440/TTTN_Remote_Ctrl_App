@@ -9,6 +9,9 @@ from typing import List, Optional, Union
 from jose import JWTError, jwt
 import crud, models, schemas, utils
 from database import get_db, engine
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 # Tải biến môi trường từ file .env
 load_dotenv()
@@ -22,6 +25,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -76,6 +87,30 @@ def decode_token(token: str):
     except JWTError:
         return None
 
+# Add this handler to your FastAPI app - near the beginning of your main.py file
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    # Format the exception details
+    error_detail = str(exc)
+    
+    # Return the exception details in the response
+    return JSONResponse(
+        status_code=500,
+        content={"detail": error_detail}
+    )
+
+# If using SQLAlchemy, also add a specific handler
+@app.exception_handler(IntegrityError)
+async def sqlalchemy_exception_handler(request, exc):
+    # Extract and format the SQLAlchemy error
+    error_detail = str(exc)
+    
+    # Return the formatted error
+    return JSONResponse(
+        status_code=422,
+        content={"detail": error_detail}
+    )
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the API!"}
@@ -83,8 +118,17 @@ def read_root():
 @app.get("/users/")
 def get_users(db: Session = Depends(get_db)):
     users = db.query(models.User).all()
-    return {"users": [{"id": user.id, "username": user.username, "email": user.email, "role": user.role} for user in users]}
-
+    return {"users": [
+        {
+            "id": user.id, 
+            "username": user.username, 
+            "email": user.email, 
+            "phone_number": user.phone_number,
+            "password": "********" if user.password else "",  # Masked password - never expose real hashes
+            "role": user.role
+        } 
+        for user in users
+    ]}
 # Thay thế hàm login hiện tại
 @app.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
