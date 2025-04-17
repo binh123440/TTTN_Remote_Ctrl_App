@@ -4,9 +4,10 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Union
 from jose import JWTError, jwt
+from fastapi.middleware.cors import CORSMiddleware
 import crud, models, schemas, utils
 from database import get_db, engine
 
@@ -24,6 +25,14 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Hoặc ["*"] nếu bạn đang dev và muốn mở cho tất cả
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Hàm để lấy user hiện tại từ token JWT
 
@@ -272,6 +281,28 @@ def create_command_list(
         "commands": json.loads(result.commands)
     }
 # API cho Profile
+@app.get("/profiles/", response_model=List[schemas.ProfileResponseList])
+def get_profiles(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)  # Bỏ nếu chưa dùng auth
+):
+    profiles = db.query(models.Profile).\
+        options(joinedload(models.Profile.command_list), joinedload(models.Profile.device_group)).\
+        all()
+
+    # Trả về các profiles cùng với tên của command và device group
+    return [
+        schemas.ProfileResponseList(
+            id=profile.id,
+            name=profile.name,
+            command_list_id=profile.command_list_id,
+            command_name=profile.command_list.name if profile.command_list else None,
+            device_group_id=profile.device_group_id,
+            device_group_name=profile.device_group.group_name if profile.device_group else None
+        )
+        for profile in profiles
+    ]
+
 @app.post("/profiles/", response_model=schemas.ProfileResponse)
 def create_profile(
     profile: schemas.ProfileCreate,
@@ -312,28 +343,33 @@ def create_profile(
 # API để gán profile cho operator
 @app.post("/assign-profile/")
 def assign_profile(
-    profile_id: int,
-    operator_id: int,
+    assign_profile: schemas.AssignProfileRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_team_lead_user)
 ):
+    profile_id = assign_profile.profile_id
+    operator_id = assign_profile.operator_id
+
     # Kiểm tra profile tồn tại
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     # Kiểm tra operator tồn tại
     operator = crud.get_user(db, operator_id)
     if not operator:
         raise HTTPException(status_code=404, detail="Operator not found")
-    
+
     # Chỉ gán cho user có vai trò operator
     if operator.role != "operator":
-        raise HTTPException(status_code=400, detail="Can only assign profiles to users with operator role")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Can only assign profiles to users with operator role"
+        )
+
     # Gán profile
-    user_profile = crud.assign_profile_to_operator(db, profile_id, operator_id)
-    
+    crud.assign_profile_to_operator(db, profile_id, operator_id)
+
     return {"message": "Profile assigned successfully"}
 
 @app.post("/devices/", response_model=schemas.DeviceResponse)
@@ -618,3 +654,20 @@ def delete_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     
     return {"message": "Profile deleted successfully"}
+
+@app.get("/command-lists/", response_model=List[schemas.CommandListResponse])
+def get_command_lists(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Lấy danh sách các lệnh từ bảng command_lists
+    command_lists = db.query(models.CommandList).all()
+    
+    return [
+        {
+            "id": command_list.id,
+            "name": command_list.name,
+            "commands": command_list.commands,
+        } 
+        for command_list in command_lists
+    ]

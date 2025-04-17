@@ -29,7 +29,7 @@ class CommandListResponse(BaseModel):
     commands: List[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas cho Profile
 class ProfileCreate(BaseModel):
@@ -44,7 +44,21 @@ class ProfileResponse(BaseModel):
     device_group_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+class ProfileResponseList(BaseModel):
+    id: int
+    name: str
+    command_list_id: int
+    command_name: Optional[str]  # Thêm trường này để chứa name của command
+    device_group_id: int
+    device_group_name: Optional[str]  # Thêm trường này để chứa name của device group
+
+    class Config:
+        from_attributes = True
+
+class AssignProfileRequest(BaseModel):
+    profile_id: int
+    operator_id: int
         
 class Token(BaseModel):
     access_token: str
@@ -84,7 +98,7 @@ class DeviceResponse(DeviceBase):
     created_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # Thêm mapping cho password_hash -> password
         alias_generator = lambda field: "password_hash" if field == "password" else field
 
@@ -105,7 +119,7 @@ class UserResponse(BaseModel):
     role: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         
 class DeviceUpdate(BaseModel):
     ip_address: Optional[str] = None
