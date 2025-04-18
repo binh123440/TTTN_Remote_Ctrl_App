@@ -29,7 +29,7 @@ class CommandListResponse(BaseModel):
     commands: List[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
 
 # Schemas cho Profile
 class ProfileCreate(BaseModel):
@@ -44,7 +44,22 @@ class ProfileResponse(BaseModel):
     device_group_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
+
+class ProfileResponseList(BaseModel):
+    id: int
+    name: str
+    command_list_id: int
+    command_name: Optional[str]  # Thêm trường này để chứa name của command
+    device_group_id: int
+    device_group_name: Optional[str]  # Thêm trường này để chứa name của device group
+
+    class Config:
+        from_attributes = True
+
+class AssignProfileRequest(BaseModel):
+    profile_id: int
+    operator_id: int
         
 class Token(BaseModel):
     access_token: str
@@ -53,8 +68,8 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Union[str, None] = None
     role: Union[str, None] = None
-# Thêm phần này vào file schemas.py
 
+# Device Group schemas
 class DeviceGroupCreate(BaseModel):
     group_name: str
     description: Optional[str] = None
@@ -64,6 +79,7 @@ class DeviceGroupResponse(BaseModel):
     group_name: str
     description: Optional[str] = None
 
+# Device schemas
 class DeviceBase(BaseModel):
     ip_address: str
     port: str
@@ -84,12 +100,11 @@ class DeviceResponse(DeviceBase):
     created_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
         # Thêm mapping cho password_hash -> password
         alias_generator = lambda field: "password_hash" if field == "password" else field
 
-# Thêm vào schemas.py cho các chức năng cập nhật
-
+# Update schemas
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -105,7 +120,7 @@ class UserResponse(BaseModel):
     role: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
         
 class DeviceUpdate(BaseModel):
     ip_address: Optional[str] = None

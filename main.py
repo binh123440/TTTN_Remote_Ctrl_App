@@ -4,14 +4,14 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Union
 from jose import JWTError, jwt
-import crud, models, schemas, utils
-from database import get_db, engine
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+import crud, models, schemas, utils
+from database import get_db, engine
 
 # Tải biến môi trường từ file .env
 load_dotenv()
@@ -26,6 +26,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, replace with specific origins
@@ -34,60 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# Hàm để lấy user hiện tại từ token JWT
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    username = decode_token(token)
-    if username is None:
-        raise credentials_exception
-    
-    user = crud.get_user_by_username(db, username)
-    if user is None:
-        raise credentials_exception
-    
-    return user
-# Kiểm tra phân quyền
-def get_admin_user(current_user: models.User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can perform this action")
-    return current_user
-
-def get_team_lead_user(current_user: models.User = Depends(get_current_user)):
-    if current_user.role != "team_lead":
-        raise HTTPException(status_code=403, detail="Only team lead can perform this action")
-    return current_user
-
-# Thêm các hàm này trước các route
-
-def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-def decode_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            return None
-        return username
-    except JWTError:
-        return None
-
-# Add this handler to your FastAPI app - near the beginning of your main.py file
+# Add exception handlers for better error reporting
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     # Format the exception details
@@ -111,6 +60,55 @@ async def sqlalchemy_exception_handler(request, exc):
         content={"detail": error_detail}
     )
 
+# Hàm để lấy user hiện tại từ token JWT
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    username = decode_token(token)
+    if username is None:
+        raise credentials_exception
+    
+    user = crud.get_user_by_username(db, username)
+    if user is None:
+        raise credentials_exception
+    
+    return user
+
+# Kiểm tra phân quyền
+def get_admin_user(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can perform this action")
+    return current_user
+
+def get_team_lead_user(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "team_lead":
+        raise HTTPException(status_code=403, detail="Only team lead can perform this action")
+    return current_user
+
+def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def decode_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        return username
+    except JWTError:
+        return None
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the API!"}
@@ -129,6 +127,7 @@ def get_users(db: Session = Depends(get_db)):
         } 
         for user in users
     ]}
+
 # Thay thế hàm login hiện tại
 @app.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -228,8 +227,7 @@ def reset_password(request: schemas.ResetPasswordConfirm, db: Session = Depends(
     updated_user = crud.update_password(db, user, request.new_password)
     return {"message": "Mật khẩu đã được cập nhật thành công!"}
 
-# Thêm endpoint này vào file main.py
-
+# Device Groups API
 @app.post("/device-groups/", response_model=schemas.DeviceGroupResponse)
 def create_device_group(
     device_group: schemas.DeviceGroupCreate, 
@@ -289,7 +287,7 @@ def get_device_group(
 def create_command_list(
     command_list: schemas.CommandListCreate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_team_lead_user)
 ):
     # Kiểm tra quyền hạn team lead
     if current_user.role != "team_lead":
@@ -313,9 +311,51 @@ def create_command_list(
     return {
         "id": result.id,
         "name": result.name,
-        "commands": json.loads(result.commands)
+        "commands": result.commands if isinstance(result.commands, list) else 
+                  json.loads(result.commands) if isinstance(result.commands, (str, bytes, bytearray)) else []
     }
+
+@app.get("/command-lists/", response_model=List[schemas.CommandListResponse])
+def get_command_lists(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    # Lấy danh sách các lệnh từ bảng command_lists
+    command_lists = db.query(models.CommandList).all()
+    
+    return [
+        {
+            "id": command_list.id,
+            "name": command_list.name,
+            "commands": command_list.commands if isinstance(command_list.commands, list) else 
+                      json.loads(command_list.commands) if isinstance(command_list.commands, (str, bytes, bytearray)) else []
+        } 
+        for command_list in command_lists
+    ]
+
 # API cho Profile
+@app.get("/profiles/", response_model=List[schemas.ProfileResponseList])
+def get_profiles(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_team_lead_user)
+):
+    profiles = db.query(models.Profile).\
+        options(joinedload(models.Profile.command_list), joinedload(models.Profile.device_group)).\
+        all()
+
+    # Trả về các profiles cùng với tên của command và device group
+    return [
+        schemas.ProfileResponseList(
+            id=profile.id,
+            name=profile.name,
+            command_list_id=profile.command_list_id,
+            command_name=profile.command_list.name if profile.command_list else None,
+            device_group_id=profile.device_group_id,
+            device_group_name=profile.device_group.group_name if profile.device_group else None
+        )
+        for profile in profiles
+    ]
+
 @app.post("/profiles/", response_model=schemas.ProfileResponse)
 def create_profile(
     profile: schemas.ProfileCreate,
@@ -356,28 +396,33 @@ def create_profile(
 # API để gán profile cho operator
 @app.post("/assign-profile/")
 def assign_profile(
-    profile_id: int,
-    operator_id: int,
+    assign_profile: schemas.AssignProfileRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_team_lead_user)
 ):
+    profile_id = assign_profile.profile_id
+    operator_id = assign_profile.operator_id
+
     # Kiểm tra profile tồn tại
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    
+
     # Kiểm tra operator tồn tại
     operator = crud.get_user(db, operator_id)
     if not operator:
         raise HTTPException(status_code=404, detail="Operator not found")
-    
+
     # Chỉ gán cho user có vai trò operator
     if operator.role != "operator":
-        raise HTTPException(status_code=400, detail="Can only assign profiles to users with operator role")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Can only assign profiles to users with operator role"
+        )
+
     # Gán profile
-    user_profile = crud.assign_profile_to_operator(db, profile_id, operator_id)
-    
+    crud.assign_profile_to_operator(db, profile_id, operator_id)
+
     return {"message": "Profile assigned successfully"}
 
 @app.post("/devices/", response_model=schemas.DeviceResponse)
@@ -434,10 +479,7 @@ def create_device(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-# Thêm vào main.py
-
 # 1. ADMIN APIS - USER MANAGEMENT
-
 @app.put("/users/{user_id}", response_model=schemas.UserResponse)
 def update_user(
     user_id: int,
@@ -475,7 +517,6 @@ def delete_user(
     return {"message": "User deleted successfully"}
 
 # 2. TEAM LEAD APIS - DEVICE MANAGEMENT
-
 @app.put("/devices/{device_id}", response_model=schemas.DeviceResponse)
 def update_device(
     device_id: int,
@@ -525,7 +566,6 @@ def delete_device(
     return {"message": "Device deleted successfully"}
 
 # 3. TEAM LEAD APIS - DEVICE GROUP MANAGEMENT
-
 @app.put("/device-groups/{device_group_id}", response_model=schemas.DeviceGroupResponse)
 def update_device_group(
     device_group_id: int,
@@ -567,7 +607,6 @@ def delete_device_group(
     return {"message": "Device group deleted successfully"}
 
 # 4. TEAM LEAD APIS - COMMAND LIST MANAGEMENT
-
 @app.put("/command-lists/{command_list_id}", response_model=schemas.CommandListResponse)
 def update_command_list(
     command_list_id: int,
@@ -593,7 +632,8 @@ def update_command_list(
     return {
         "id": updated_command_list.id,
         "name": updated_command_list.name,
-        "commands": json.loads(updated_command_list.commands)
+        "commands": updated_command_list.commands if isinstance(updated_command_list.commands, list) else 
+                  json.loads(updated_command_list.commands) if isinstance(updated_command_list.commands, (str, bytes, bytearray)) else []
     }
 
 @app.delete("/command-lists/{command_list_id}")
@@ -609,7 +649,6 @@ def delete_command_list(
     return {"message": "Command list deleted successfully"}
 
 # 5. TEAM LEAD APIS - PROFILE MANAGEMENT
-
 @app.put("/profiles/{profile_id}", response_model=schemas.ProfileResponse)
 def update_profile(
     profile_id: int,
