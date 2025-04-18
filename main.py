@@ -284,7 +284,43 @@ def get_device_group(
         "description": device_group.description
     }
 
+
 # API cho CommandList
+@app.get("/com" \
+"mand-lists/", response_model=List[schemas.CommandListResponse])
+def get_all_command_lists(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+   
+    command_lists = db.query(models.CommandList).all()
+    return [
+        {
+            "id": command_list.id,
+            "name": command_list.name,
+            "commands": json.loads(command_list.commands),
+            "created_at": command_list.created_at
+        }
+        for command_list in command_lists
+    ]
+
+
+@app.get("/command-lists/{id}", response_model=schemas.CommandListResponse)
+def get_command_list_by_id(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    command_list = crud.get_command_list(db, id)
+    if not command_list:
+        raise HTTPException(status_code=404, detail="Command list not found")
+    
+    return {
+        "id": command_list.id,
+        "name": command_list.name,
+        "commands": json.loads(command_list.commands),
+        "created_at": command_list.created_at
+    }
 @app.post("/command-lists/", response_model=schemas.CommandListResponse, status_code=status.HTTP_201_CREATED)
 def create_command_list(
     command_list: schemas.CommandListCreate, 

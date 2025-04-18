@@ -6,8 +6,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# In đường dẫn file .env để kiểm tra
+print("Looking for .env file at:", os.path.abspath(".env"))
+
+
 # Lấy DATABASE_URL từ biến môi trường hoặc sử dụng giá trị mặc định
 DATABASE_URL = os.getenv("DATABASE_URL")
+print("DATABASE_URL:", DATABASE_URL)
 
 # Tạo đối tượng engine
 engine = create_engine(DATABASE_URL)

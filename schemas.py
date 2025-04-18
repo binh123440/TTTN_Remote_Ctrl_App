@@ -29,7 +29,7 @@ class CommandListResponse(BaseModel):
     commands: List[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas cho Profile
 class ProfileCreate(BaseModel):
@@ -44,7 +44,7 @@ class ProfileResponse(BaseModel):
     device_group_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         
 class Token(BaseModel):
     access_token: str
@@ -105,7 +105,7 @@ class UserResponse(BaseModel):
     role: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
         
 class DeviceUpdate(BaseModel):
     ip_address: Optional[str] = None

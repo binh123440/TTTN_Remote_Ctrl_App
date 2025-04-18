@@ -4,6 +4,8 @@ import { lazy } from 'react';
 import Loadable from 'components/Loadable';
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from './ProtectedRoute';
+import CommandForm from '../pages/teamlead/commandForm';
+import CommandsPage from '../pages/teamlead/commandPage';
 
 // render- Dashboard
 const DashboardDefault = Loadable(lazy(() => import('pages/dashboard/default')));
@@ -56,6 +58,18 @@ const MainRoutes = {
     {
       path: '/admin/users',
       element: <UserManagement />
+    },
+    {
+      path: 'commands',
+      element: <CommandsPage />
+    },
+    {
+      path: 'commands/new',
+      element: <CommandForm />
+    },
+    {
+      path: 'commands/edit/:id',
+      element: <CommandForm />
     }
   ]
 };
