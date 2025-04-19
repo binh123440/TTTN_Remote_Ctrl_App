@@ -98,7 +98,7 @@ export default function AuthLogin ({ isDemo = false }) {
               }
 
               // Navigate to dashboard
-              navigate('/')
+              window.location.href = '/';
             } else {
               throw new Error('Invalid response format: missing access token')
             }

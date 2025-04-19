@@ -36,6 +36,19 @@ const isAuthenticated = () => {
   }
 };
 
+// Get user role from token
+const getUserRole = () => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role;
+  } catch (e) {
+    return null;
+  }
+};
+
 // Authentication guard component
 const AuthGuard = ({ children }) => {
   const location = useLocation();
@@ -43,6 +56,21 @@ const AuthGuard = ({ children }) => {
   if (!isAuthenticated()) {
     // Save the location they were trying to go to for later
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
+};
+
+// Admin guard component - only allows admin users
+const AdminGuard = ({ children }) => {
+  const location = useLocation();
+  
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  
+  if (getUserRole() !== 'admin') {
+    return <Navigate to="/dashboard/default" state={{ from: location }} replace />;
   }
 
   return children;
@@ -89,7 +117,11 @@ const MainRoutes = {
     },
     {
       path: '/admin/users',
-      element: <UserManagement />
+      element: (
+        <AdminGuard>
+          <UserManagement />
+        </AdminGuard>
+      )
     },
     {
       path: '/profile',

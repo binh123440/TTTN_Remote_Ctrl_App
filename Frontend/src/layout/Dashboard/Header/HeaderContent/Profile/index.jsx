@@ -80,7 +80,9 @@ export default function Profile() {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('tokenType');
-      navigate('/login');
+
+      window.location.href = '/login'; 
+      // navigate('/login');
     }
   };
 
