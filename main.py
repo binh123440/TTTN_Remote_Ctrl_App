@@ -227,6 +227,23 @@ def reset_password(request: schemas.ResetPasswordConfirm, db: Session = Depends(
     updated_user = crud.update_password(db, user, request.new_password)
     return {"message": "Mật khẩu đã được cập nhật thành công!"}
 
+@app.put("/users/update-password")
+def update_password(password_update: schemas.PasswordUpdate,
+                    db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+
+    # Kiểm tra mật khẩu cũ
+    if not utils.verify_password(password_update.old_password, current_user.password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Mã hóa mật khẩu mới và lưu vào cơ sở dữ liệu
+    hashed_new_password = utils.hash_password(password_update.new_password)  # Sử dụng hàm hash_password
+    current_user.password = hashed_new_password  
+    db.commit()
+
+    return {"message": "Password updated successfully"}
+
+
 # Device Groups API
 @app.post("/device-groups/", response_model=schemas.DeviceGroupResponse)
 def create_device_group(
@@ -701,3 +718,12 @@ def delete_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     
     return {"message": "Profile deleted successfully"}
+
+
+@app.post("/logout")
+def logout(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Chỉ cần gửi phản hồi xác nhận logout thành công
+    return {"message": "Logged out successfully"}

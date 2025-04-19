@@ -1,9 +1,11 @@
 import { lazy } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 
 // project imports
 import Loadable from 'components/Loadable';
 import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from './ProtectedRoute';
+import UpdatePassword from 'layout/Dashboard/Header/HeaderContent/Profile/UpdatePassword';
 
 // render- Dashboard
 const DashboardDefault = Loadable(lazy(() => import('pages/dashboard/default')));
@@ -20,16 +22,45 @@ const Profile = Loadable(lazy(() => import('pages/profiles/profile')));
 const CreateProfile = Loadable(lazy(() => import('pages/profiles/profile-create')));
 const AssignProfile = Loadable(lazy(() => import('pages/profiles/profile-assign')));
 
+// Authentication check helper
+const isAuthenticated = () => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) return false;
+  
+  try {
+    // Basic check if token format is valid
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp * 1000 > Date.now();
+  } catch (e) {
+    return false;
+  }
+};
+
+// Authentication guard component
+const AuthGuard = ({ children }) => {
+  const location = useLocation();
+  
+  if (!isAuthenticated()) {
+    // Save the location they were trying to go to for later
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
+};
 
 // ==============================|| MAIN ROUTING ||============================== //
 
 const MainRoutes = {
   path: '/',
-  element: <DashboardLayout />,
+  element: (
+    <AuthGuard>
+      <DashboardLayout />
+    </AuthGuard>
+  ),
   children: [
     {
       path: '/',
-      element: <DashboardDefault />
+      element: <Navigate to="/dashboard/default" replace />
     },
     {
       path: 'dashboard',
@@ -68,21 +99,13 @@ const MainRoutes = {
       path: '/create-profile',
       element: <CreateProfile />
     },
-        // {
-        //   path: 'edit/:id',
-        //   element: <EditProfile />
-        // },
-        // {
-        //   path: 'view/:id',
-        //   element: <ViewProfile />
-        // },
-        // {
-        //   path: 'delete/:id',
-        //   element: <DeleteProfile />
-        // },
     {
       path: 'assign-profile',
       element: <AssignProfile />
+    },
+    {
+      path: 'update-password',
+      element: <UpdatePassword />
     }
   ]
 };

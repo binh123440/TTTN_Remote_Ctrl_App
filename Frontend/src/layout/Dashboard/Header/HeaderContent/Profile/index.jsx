@@ -1,8 +1,9 @@
+// import ...
 import PropTypes from 'prop-types';
-import { useRef, useState } from 'react';
-
-// material-ui
+import { useEffect, useState, useRef } from 'react';
 import { useTheme } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom'; // <-- thêm dòng này
+
 import ButtonBase from '@mui/material/ButtonBase';
 import CardContent from '@mui/material/CardContent';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -16,7 +17,6 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
-// project imports
 import ProfileTab from './ProfileTab';
 import SettingTab from './SettingTab';
 import Avatar from 'components/@extended/Avatar';
@@ -24,13 +24,11 @@ import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
 import IconButton from 'components/@extended/IconButton';
 
-// assets
 import LogoutOutlined from '@ant-design/icons/LogoutOutlined';
 import SettingOutlined from '@ant-design/icons/SettingOutlined';
 import UserOutlined from '@ant-design/icons/UserOutlined';
 import avatar1 from 'assets/images/users/avatar-1.png';
 
-// tab panel wrapper
 function TabPanel({ children, value, index, ...other }) {
   return (
     <div role="tabpanel" hidden={value !== index} id={`profile-tabpanel-${index}`} aria-labelledby={`profile-tab-${index}`} {...other}>
@@ -46,28 +44,44 @@ function a11yProps(index) {
   };
 }
 
-// ==============================|| HEADER CONTENT - PROFILE ||============================== //
-
 export default function Profile() {
   const theme = useTheme();
+  const navigate = useNavigate(); // <-- sử dụng navigate
 
   const anchorRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const handleToggle = () => {
-    setOpen((prevOpen) => !prevOpen);
-  };
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    const storedUsername = localStorage.getItem('username');
+    if (storedUsername) setUsername(storedUsername);
+  }, []);
+
+  const handleToggle = () => setOpen((prevOpen) => !prevOpen);
 
   const handleClose = (event) => {
-    if (anchorRef.current && anchorRef.current.contains(event.target)) {
-      return;
-    }
+    if (anchorRef.current && anchorRef.current.contains(event.target)) return;
     setOpen(false);
   };
 
   const [value, setValue] = useState(0);
+  const handleChange = (event, newValue) => setValue(newValue);
 
-  const handleChange = (event, newValue) => {
-    setValue(newValue);
+  // ✅ Hàm logout
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch('http://localhost:8000/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error('Error calling logout API:', e);
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('tokenType');
+      navigate('/login');
+    }
   };
 
   return (
@@ -90,7 +104,7 @@ export default function Profile() {
         <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center', p: 0.5 }}>
           <Avatar alt="profile user" src={avatar1} size="sm" />
           <Typography variant="subtitle1" sx={{ textTransform: 'capitalize' }}>
-            John Doe
+            {username || 'User'}
           </Typography>
         </Stack>
       </ButtonBase>
@@ -101,16 +115,7 @@ export default function Profile() {
         role={undefined}
         transition
         disablePortal
-        popperOptions={{
-          modifiers: [
-            {
-              name: 'offset',
-              options: {
-                offset: [0, 9]
-              }
-            }
-          ]
-        }}
+        popperOptions={{ modifiers: [{ name: 'offset', options: { offset: [0, 9] } }] }}
       >
         {({ TransitionProps }) => (
           <Transitions type="grow" position="top-right" in={open} {...TransitionProps}>
@@ -123,16 +128,14 @@ export default function Profile() {
                         <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center' }}>
                           <Avatar alt="profile user" src={avatar1} sx={{ width: 32, height: 32 }} />
                           <Stack>
-                            <Typography variant="h6">John Doe</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              UI/UX Designer
-                            </Typography>
+                            <Typography variant="h6">{username || 'User'}</Typography>
+                            <Typography variant="body2" color="text.secondary">UI/UX Designer</Typography>
                           </Stack>
                         </Stack>
                       </Grid>
                       <Grid>
                         <Tooltip title="Logout">
-                          <IconButton size="large" sx={{ color: 'text.primary' }}>
+                          <IconButton size="large" sx={{ color: 'text.primary' }} onClick={handleLogout}>
                             <LogoutOutlined />
                           </IconButton>
                         </Tooltip>
@@ -143,41 +146,16 @@ export default function Profile() {
                   <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs variant="fullWidth" value={value} onChange={handleChange} aria-label="profile tabs">
                       <Tab
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          textTransform: 'capitalize',
-                          gap: 1.25,
-                          '& .MuiTab-icon': {
-                            marginBottom: 0
-                          }
-                        }}
-                        icon={<UserOutlined />}
-                        label="Profile"
-                        {...a11yProps(0)}
-                      />
+                        sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', textTransform: 'capitalize', gap: 1.25, '& .MuiTab-icon': { marginBottom: 0 } }}
+                        icon={<UserOutlined />} label="Profile" {...a11yProps(0)} />
                       <Tab
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          textTransform: 'capitalize',
-                          gap: 1.25,
-                          '& .MuiTab-icon': {
-                            marginBottom: 0
-                          }
-                        }}
-                        icon={<SettingOutlined />}
-                        label="Setting"
-                        {...a11yProps(1)}
-                      />
+                        sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', textTransform: 'capitalize', gap: 1.25, '& .MuiTab-icon': { marginBottom: 0 } }}
+                        icon={<SettingOutlined />} label="Setting" {...a11yProps(1)} />
                     </Tabs>
                   </Box>
+
                   <TabPanel value={value} index={0} dir={theme.direction}>
-                    <ProfileTab />
+                    <ProfileTab handleLogout={handleLogout} />
                   </TabPanel>
                   <TabPanel value={value} index={1} dir={theme.direction}>
                     <SettingTab />
@@ -192,4 +170,9 @@ export default function Profile() {
   );
 }
 
-TabPanel.propTypes = { children: PropTypes.node, value: PropTypes.number, index: PropTypes.number, other: PropTypes.any };
+TabPanel.propTypes = {
+  children: PropTypes.node,
+  value: PropTypes.number,
+  index: PropTypes.number,
+  other: PropTypes.any
+};

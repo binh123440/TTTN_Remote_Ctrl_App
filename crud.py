@@ -1,5 +1,6 @@
 import json
 from typing import List, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from models import User, Device, DeviceGroup, CommandList, Profile, UserProfile, Session as DbSession, Log, Reading
@@ -7,8 +8,8 @@ from models import User, Device, DeviceGroup, CommandList, Profile, UserProfile,
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # User CRUD
-def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
+# def get_user_by_email(db: Session, email: str):
+#     return db.query(User).filter(User.email == email).first()
 
 def get_user_by_username(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
@@ -32,7 +33,7 @@ def create_user(db: Session, username: str, email: str, password: str, role: str
     new_user = User(
         username=username,
         email=email,
-        password=hashed_password,  # Lưu ý tên trường là password_hash
+        password=hashed_password,  
         role=role,
         phone_number=phone_number
     )

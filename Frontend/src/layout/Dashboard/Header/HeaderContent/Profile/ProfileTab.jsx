@@ -1,4 +1,6 @@
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
+
 
 // material-ui
 import List from '@mui/material/List';
@@ -15,7 +17,8 @@ import WalletOutlined from '@ant-design/icons/WalletOutlined';
 
 // ==============================|| HEADER PROFILE - PROFILE TAB ||============================== //
 
-export default function ProfileTab() {
+export default function ProfileTab({handleLogout}) {
+  const navigate = useNavigate();
   return (
     <List component="nav" sx={{ p: 0, '& .MuiListItemIcon-root': { minWidth: 32 } }}>
       <ListItemButton>
@@ -23,6 +26,12 @@ export default function ProfileTab() {
           <EditOutlined />
         </ListItemIcon>
         <ListItemText primary="Edit Profile" />
+      </ListItemButton>
+      <ListItemButton onClick={() => navigate('/update-password')}>
+        <ListItemIcon>
+          <EditOutlined />
+        </ListItemIcon>
+        <ListItemText primary="Update Password" />
       </ListItemButton>
       <ListItemButton>
         <ListItemIcon>
@@ -43,7 +52,7 @@ export default function ProfileTab() {
         </ListItemIcon>
         <ListItemText primary="Billing" />
       </ListItemButton>
-      <ListItemButton>
+      <ListItemButton onClick={handleLogout}>
         <ListItemIcon>
           <LogoutOutlined />
         </ListItemIcon>

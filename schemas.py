@@ -146,3 +146,7 @@ class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     command_list_id: Optional[int] = None
     device_group_id: Optional[int] = None
+    
+class PasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
