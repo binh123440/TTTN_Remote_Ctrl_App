@@ -131,3 +131,6 @@ class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     command_list_id: Optional[int] = None
     device_group_id: Optional[int] = None
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext'; 
 import {
   Box,
   Button,
@@ -13,20 +14,23 @@ import {
   TableHead,
   TableRow,
   Typography,
-  Checkbox
+  Checkbox,
+  Alert
 } from '@mui/material';
-import MainCard from './MainCard'; // Giả sử bạn đã có component MainCard
+import MainCard from '../../components/MainCard';
 import { API_BASE_URL } from '../../config';
 
 const CommandsPage = () => {
+  const { token } = useAuth();
   const [commandLists, setCommandLists] = useState([]);
   const [selectedCommands, setSelectedCommands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // Thêm trạng thái cho lỗi
   const navigate = useNavigate();
 
   // Fetch command lists from API
   useEffect(() => {
-    const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJuZ29jaGFvIiwicm9sZSI6InRlYW1fbGVhZCIsImV4cCI6MTc0NDg4MjMwMX0.5sfZwmgi4k-1zv6pbpe_JTo4Id-xqFJlZkV1oNjGWVo`;
+
     axios
       .get(API_BASE_URL + '/command-lists', {
         headers: {
@@ -39,24 +43,60 @@ const CommandsPage = () => {
       })
       .catch((error) => {
         console.error('Error fetching command lists:', error);
+        setError('Failed to load command lists.');
         setLoading(false);
       });
-  }, []);
+  }, [token]);
 
   // Handle delete selected commands
-  const handleDelete = () => {
+  const handleDelete = async (ids) => {
+    if (!token) {
+      setError('No authentication token found. Please log in again.');
+      return;
+    }
+    if (ids.length === 0) {
+      setError('Please select at least one command to delete.');
+      return;
+    }
+  
     setLoading(true);
-    axios
-      .delete(API_BASE_URL + '/command-lists/', { data: { ids: selectedCommands } })
-      .then(() => {
-        setCommandLists((prev) => prev.filter((cmd) => !selectedCommands.includes(cmd.id)));
-        setSelectedCommands([]);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error deleting commands:', error);
-        setLoading(false);
-      });
+    setError(null);
+  
+    try {
+      if (ids.length === 1) {
+        // Xóa một command list
+        await axios.delete(`${API_BASE_URL}/command-lists/${ids[0]}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } else {
+        // Xóa nhiều command lists
+        await axios.delete(`${API_BASE_URL}/command-lists/bulk`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          data: { ids }, // Đảm bảo ids là một mảng số nguyên
+        });
+      }
+  
+      // Cập nhật danh sách command lists sau khi xóa
+      setCommandLists((prev) => prev.filter((cmd) => !ids.includes(cmd.id)));
+      setSelectedCommands([]);
+    } catch (error) {
+      console.error('Error deleting commands:', error.response?.data || error.message);
+  
+      // Kiểm tra nếu error.response?.data là một đối tượng
+      const errorMessage =
+        typeof error.response?.data === 'string'
+          ? error.response?.data
+          : error.response?.data?.detail || 'Failed to delete commands. Please try again.';
+  
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,8 +117,8 @@ const CommandsPage = () => {
             <Button
               variant="contained"
               color="error"
-              onClick={handleDelete}
-              disabled={selectedCommands.length === 0}
+              onClick={() => handleDelete(selectedCommands)} // Xóa nhiều command lists
+              disabled={selectedCommands.length === 0 || loading}
             >
               Delete Selected
             </Button>
@@ -87,6 +127,11 @@ const CommandsPage = () => {
       }
     >
       <Box p={3}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {typeof error === 'string' ? error : JSON.stringify(error)}
+          </Alert>
+        )}
         {loading ? (
           <Box display="flex" justifyContent="center">
             <CircularProgress />
@@ -99,7 +144,8 @@ const CommandsPage = () => {
                   <TableCell>Select</TableCell>
                   <TableCell>ID</TableCell>
                   <TableCell>Name</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell>Command</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -112,15 +158,20 @@ const CommandsPage = () => {
                           if (e.target.checked) {
                             setSelectedCommands((prev) => [...prev, command.id]);
                           } else {
-                            setSelectedCommands((prev) =>
-                              prev.filter((id) => id !== command.id)
-                            );
+                            setSelectedCommands((prev) => prev.filter((id) => id !== command.id));
                           }
                         }}
                       />
                     </TableCell>
                     <TableCell>{command.id}</TableCell>
                     <TableCell>{command.name}</TableCell>
+                    <TableCell>
+                      {command.commands.map((cmd, index) => (
+                        <Typography key={index} style={{ whiteSpace: 'pre-line' }}>
+                          {typeof cmd === 'string' ? cmd : `${cmd.command}: ${cmd.description}`}
+                        </Typography>
+                      ))}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="outlined"
@@ -129,8 +180,16 @@ const CommandsPage = () => {
                       >
                         Edit
                       </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDelete([command.id])} // Xóa một command list
+                        sx={{ ml: 2 }}
+                      >
+                        Delete
+                      </Button>
                     </TableCell>
-                  </TableRow>
+                </TableRow>
                 ))}
               </TableBody>
             </Table>

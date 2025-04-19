@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 import os
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -286,8 +287,7 @@ def get_device_group(
 
 
 # API cho CommandList
-@app.get("/com" \
-"mand-lists/", response_model=List[schemas.CommandListResponse])
+@app.get("/command-lists/", response_model=List[schemas.CommandListResponse])
 def get_all_command_lists(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
@@ -632,6 +632,28 @@ def update_command_list(
         "commands": json.loads(updated_command_list.commands)
     }
 
+
+# Model cho payload xóa nhiều
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+# Endpoint xóa nhiều command lists
+
+@app.delete("/command-lists/bulk")
+def delete_command_lists(
+    request: BulkDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_team_lead_user)
+):
+    for command_list_id in request.ids:
+        command_list = crud.get_command_list(db, command_list_id)
+        if not command_list:
+            raise HTTPException(status_code=404, detail=f"Command list with ID {command_list_id} not found")
+        db.delete(command_list)
+    db.commit()
+    return {"message": "Command lists deleted successfully"}
+
+# Endpoint xóa một command list
 @app.delete("/command-lists/{command_list_id}")
 def delete_command_list(
     command_list_id: int,
@@ -640,9 +662,9 @@ def delete_command_list(
 ):
     success = crud.delete_command_list(db, command_list_id)
     if not success:
-        raise HTTPException(status_code=400, detail="Cannot delete command list. It may be used in profiles.")
-    
-    return {"message": "Command list deleted successfully"}
+        raise HTTPException(status_code=400, detail=f"Cannot delete command list {command_list_id}. It may be used in profiles.")
+    return {"message": f"Command list {command_list_id} deleted successfully"}
+
 
 # 5. TEAM LEAD APIS - PROFILE MANAGEMENT
 
