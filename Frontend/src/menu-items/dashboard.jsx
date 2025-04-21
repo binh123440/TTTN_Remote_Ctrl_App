@@ -71,11 +71,19 @@ const dashboard = {
       breadcrumbs: false
     },
     {
-      id: 'devices',
-      title: 'Devices',
+      id: 'device-list',
+      title: 'Device List',
       type: 'item',
       url: '/devices',
       icon: icons.LaptopOutlined,
+      breadcrumbs: false
+    },
+    {
+      id: 'device-groups',
+      title: 'Device Groups',
+      type: 'item',
+      url: '/device-groups',
+      icon: icons.TeamOutlined,
       breadcrumbs: false
     },
     {

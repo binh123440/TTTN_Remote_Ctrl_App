@@ -3,6 +3,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from models import User, Device, DeviceGroup, CommandList, Profile, UserProfile, Session as DbSession, Log, Reading
+import models
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -119,6 +120,9 @@ def delete_device_group(db: Session, device_group_id: int):
     return True
 
 # Device CRUD
+def get_all_devices(db: Session):
+    return db.query(models.Device).all()
+
 def get_device(db: Session, device_id: int):
     return db.query(Device).filter(Device.id == device_id).first()
 

@@ -416,6 +416,12 @@ def assign_profile(
     
     return {"message": "Profile assigned successfully"}
 
+
+# API để lấy danh sách thiết bị của một profile
+@app.get("/devices/", response_model=List[schemas.DeviceResponse])
+def get_devices(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.get_all_devices(db)
+
 @app.post("/devices/", response_model=schemas.DeviceResponse)
 def create_device(
     device: schemas.DeviceCreate,
@@ -511,6 +517,12 @@ def delete_user(
     return {"message": "User deleted successfully"}
 
 # 2. TEAM LEAD APIS - DEVICE MANAGEMENT
+@app.get("/devices/{device_id}", response_model=schemas.DeviceResponse)
+def get_device(device_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_team_lead_user)):
+    device = crud.get_device(db, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return device
 
 @app.put("/devices/{device_id}", response_model=schemas.DeviceResponse)
 def update_device(
@@ -561,6 +573,7 @@ def delete_device(
     return {"message": "Device deleted successfully"}
 
 # 3. TEAM LEAD APIS - DEVICE GROUP MANAGEMENT
+
 
 @app.put("/device-groups/{device_group_id}", response_model=schemas.DeviceGroupResponse)
 def update_device_group(

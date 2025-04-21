@@ -6,7 +6,10 @@ import DashboardLayout from 'layout/Dashboard';
 import ProtectedRoute from './ProtectedRoute';
 import CommandForm from '../pages/teamlead/commandForm';
 import CommandsPage from '../pages/teamlead/commandPage';
-
+import CreateDevice from '../pages/teamlead/createDevice';
+import CreateDeviceGroup from '../pages/teamlead/createDeviceGroup';
+import DevicesPage from '../pages/teamlead/devicePage';
+import DeviceGroupsPage from '../pages/teamlead/deviceGroupsPage';
 // render- Dashboard
 const DashboardDefault = Loadable(lazy(() => import('pages/dashboard/default')));
 
@@ -70,6 +73,30 @@ const MainRoutes = {
     {
       path: 'commands/edit/:id',
       element: <CommandForm />
+    },
+    {
+      path: 'devices',
+      element: <DevicesPage />,
+    },
+    {
+      path: 'devices/new',
+      element: <CreateDevice />,
+    },
+    {
+      path: 'devices/edit/:id',
+      element: <CreateDevice />,
+    },
+    {
+      path: 'device-groups/edit/:id',
+      element: <CreateDeviceGroup />,
+    },
+    {
+      path: 'device-groups',
+      element: <DeviceGroupsPage />, // Trang hiển thị danh sách Device Groups
+    },
+    {
+      path: 'device-groups/new',
+      element: <CreateDeviceGroup />,
     }
   ]
 };
