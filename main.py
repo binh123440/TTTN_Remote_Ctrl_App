@@ -727,3 +727,15 @@ def logout(
 ):
     # Chỉ cần gửi phản hồi xác nhận logout thành công
     return {"message": "Logged out successfully"}
+
+@app.post("/admin/reset-admin-password")
+def reset_admin_password(db: Session = Depends(get_db)):
+    admin = db.query(models.User).filter(models.User.username == "admin1").first()
+    
+    if not admin:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản admin1")
+    
+    admin.password = utils.hash_password("123456")  # Hash lại mật khẩu mặc định
+    db.commit()
+    
+    return {"message": "Đã reset mật khẩu của admin1 về mặc định"}

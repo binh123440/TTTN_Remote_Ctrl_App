@@ -47,7 +47,7 @@ const UpdatePassword = () => {
 
             setTimeout(() => {
                 localStorage.removeItem('accessToken');
-                window.location.href = '/free/login';
+                window.location.href = '/login';
             }, 1500);
 
             setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });

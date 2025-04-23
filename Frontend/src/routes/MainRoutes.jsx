@@ -26,7 +26,7 @@ const AssignProfile = Loadable(lazy(() => import('pages/profiles/profile-assign'
 const isAuthenticated = () => {
   const token = localStorage.getItem('accessToken');
   if (!token) return false;
-  
+
   try {
     // Basic check if token format is valid
     const payload = JSON.parse(atob(token.split('.')[1]));
@@ -40,7 +40,7 @@ const isAuthenticated = () => {
 const getUserRole = () => {
   const token = localStorage.getItem('accessToken');
   if (!token) return null;
-  
+
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.role;
@@ -52,7 +52,7 @@ const getUserRole = () => {
 // Authentication guard component
 const AuthGuard = ({ children }) => {
   const location = useLocation();
-  
+
   if (!isAuthenticated()) {
     // Save the location they were trying to go to for later
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -64,11 +64,11 @@ const AuthGuard = ({ children }) => {
 // Admin guard component - only allows admin users
 const AdminGuard = ({ children }) => {
   const location = useLocation();
-  
+
   if (!isAuthenticated()) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  
+
   if (getUserRole() !== 'admin') {
     return <Navigate to="/dashboard/default" state={{ from: location }} replace />;
   }
@@ -138,6 +138,14 @@ const MainRoutes = {
     {
       path: 'update-password',
       element: <UpdatePassword />
+    },
+    {
+      path: 'forgot-password',
+      element: <forgot-password />
+    },
+    {
+      path: 'reset-password',
+      element: <reset-password />
     }
   ]
 };
