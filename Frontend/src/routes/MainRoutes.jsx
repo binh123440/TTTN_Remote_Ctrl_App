@@ -138,14 +138,6 @@ const MainRoutes = {
     {
       path: 'update-password',
       element: <UpdatePassword />
-    },
-    {
-      path: 'forgot-password',
-      element: <forgot-password />
-    },
-    {
-      path: 'reset-password',
-      element: <reset-password />
     }
   ]
 };

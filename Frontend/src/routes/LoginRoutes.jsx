@@ -8,6 +8,7 @@ import Loadable from 'components/Loadable';
 const LoginPage = Loadable(lazy(() => import('pages/auth/Login')));
 const RegisterPage = Loadable(lazy(() => import('pages/auth/Register')));
 
+
 // ==============================|| AUTH ROUTING ||============================== //
 
 const LoginRoutes = {
