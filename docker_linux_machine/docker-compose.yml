@@ -1,0 +1,43 @@
+# docker-compose.yml
+version: '3'
+
+services:
+  ubuntu1:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ubuntu1
+    ports:
+      - "2201:22"
+    networks:
+      test_network:
+        ipv4_address: 172.20.0.2
+
+  ubuntu2:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ubuntu2
+    ports:
+      - "2202:22"
+    networks:
+      test_network:
+        ipv4_address: 172.20.0.3
+  
+  alpine1:
+    image: alpine:latest
+    container_name: alpine1
+    command: sh -c "apk add --no-cache openssh && ssh-keygen -A && echo 'root:password' | chpasswd && /usr/sbin/sshd -D"
+    ports:
+      - "2203:22"
+    networks:
+      test_network:
+        ipv4_address: 172.20.0.4
+
+networks:
+  test_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16

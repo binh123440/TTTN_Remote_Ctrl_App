@@ -1,0 +1,173 @@
+import json
+from pydantic import BaseModel, EmailStr, validator
+from typing import List, Optional, Union, Any
+from datetime import datetime
+
+class UserCreate(BaseModel):
+    username: str
+    phone_number: str
+    email: EmailStr
+    password: str
+    role: str  # Thêm trường role
+
+class ResetPasswordRequest(BaseModel):
+    email_or_phone: str
+
+class ResetPasswordConfirm(BaseModel):
+    email_or_phone: str
+    otp: str
+    new_password: str
+
+# Schemas cho Command List
+class CommandListCreate(BaseModel):
+    name: str
+    commands: List[str]
+
+class CommandListResponse(BaseModel):
+    id: int
+    name: str
+    commands: List[str]
+
+    class Config:
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
+
+# Schemas cho Profile
+class ProfileCreate(BaseModel):
+    name: str
+    command_list_id: int
+    device_group_id: int
+
+class ProfileResponse(BaseModel):
+    id: int
+    name: str
+    command_list_id: int
+    device_group_id: int
+
+    class Config:
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
+
+class ProfileResponseList(BaseModel):
+    id: int
+    name: str
+    command_list_id: int
+    command_name: Optional[str]  # Thêm trường này để chứa name của command
+    device_group_id: int
+    device_group_name: Optional[str]  # Thêm trường này để chứa name của device group
+
+    class Config:
+        from_attributes = True
+
+class AssignProfileRequest(BaseModel):
+    profile_id: int
+    operator_id: int
+        
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Union[str, None] = None
+    role: Union[str, None] = None
+
+# Device Group schemas
+class DeviceGroupCreate(BaseModel):
+    group_name: str
+    description: Optional[str] = None
+
+class DeviceGroupResponse(BaseModel):
+    id: int
+    group_name: str
+    description: Optional[str] = None
+
+# Device schemas
+class SSHRequest(BaseModel):
+    ip: str
+    username: str
+    password: str
+    command: str
+    port: int = 22
+
+class DeviceBase(BaseModel):
+    ip_address: str
+    port: str
+    connection_type: str
+    username: str
+    device_type: str = "NodeMCU"
+    location: Optional[str] = None
+    controlled_feature: str
+    device_group_id: int
+
+class DeviceCreate(DeviceBase):
+    password: str  # Mật khẩu dạng clear text, sẽ được hash
+    private_key: str
+
+class DeviceResponse(DeviceBase):
+    id: int
+    owner_id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
+        # Thêm mapping cho password_hash -> password
+        alias_generator = lambda field: "password_hash" if field == "password" else field
+
+# Update schemas
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    role: str
+    
+    class Config:
+        from_attributes = True  # Updated from orm_mode for Pydantic v2
+        
+class DeviceUpdate(BaseModel):
+    ip_address: Optional[str] = None
+    port: Optional[str] = None
+    connection_type: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    device_type: Optional[str] = None
+    location: Optional[str] = None
+    controlled_feature: Optional[str] = None
+    private_key: Optional[str] = None
+    device_group_id: Optional[int] = None
+
+class DeviceGroupUpdate(BaseModel):
+    group_name: Optional[str] = None
+    description: Optional[str] = None
+
+class CommandListUpdate(BaseModel):
+    name: Optional[str] = None
+    commands: Optional[List[str]] = None
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    command_list_id: Optional[int] = None
+    device_group_id: Optional[int] = None
+
+class UnassignProfileRequest(BaseModel):
+    profile_id: Optional[int] = None
+    operator_id: Optional[int] = None
+    profile_ids: Optional[List[int]] = None
+# Add to your schemas.py file
+class AssignProfileRequest(BaseModel):
+    profile_id: Optional[int] = None
+    operator_id: Optional[int] = None
+    profile_ids: Optional[List[int]] = None
+    operator_ids: Optional[List[int]] = None
+    
+class PasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+    
+class KillSessionRequest(BaseModel):
+    operator_id: int
