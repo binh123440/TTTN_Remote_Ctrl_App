@@ -1,0 +1,39 @@
+# Python
+## Virtual Environments
+myenv/
+src/myenv/
+src/env/
+venv/
+*.venv
+
+## Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+## Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment variables
+.env
+src/.env
+# Frontend/.env # Đã có Frontend/.gitignore, nhưng nếu muốn quản lý chung thì thêm ở đây
+# Giữ lại file template nếu có, ví dụ: Frontend/.env.example hoặc Frontend/.env copy FE
