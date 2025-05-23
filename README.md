@@ -5,56 +5,51 @@
 This project is a comprehensive Wi-Fi Hub Management System featuring a FastAPI backend and a React (Vite + Material UI) frontend. It allows for device management, SSH command execution (via HTTP and a real-time WebSocket terminal), user role management (operator, supervisor, admin, team_lead), session tracking, command logging, and network scanning capabilities.
 
 ## Project Structure
-
 wifi-hub-scan-docker/
-|
-+-- docker_linux_machine/            # Docker setup for test Linux SSH environments
-|   +-- docker-compose.yml           # Defines services like ubuntu1, ubuntu2, alpine1
-|   +-- Dockerfile                   # Dockerfile for Ubuntu SSH server image
-|
-+-- Frontend/                        # React Frontend Application (Vite based)
-|   +-- .env                         # Environment variables (local, gitignored)
-|   +-- .env copy FE                 # Example environment variables for Frontend
-|   +-- .github/                     # GitHub specific files (workflows, issue templates)
-|   +-- .gitignore                   # Frontend specific gitignore
-|   +-- package.json                 # Frontend dependencies and scripts
-|   +-- vite.config.mjs              # Vite configuration
-|   +-- src/                         # Frontend source code
-|   |   +-- App.jsx                  # Main application component with routing
-|   |   +-- api/                     # API interaction services
-|   |   +-- components/              # Reusable UI components
-|   |   +-- menu-items/              # Definitions for navigation menus
-|   |   +-- pages/                   # Page components
-|   |   |   +-- admin/
-|   |   |   +-- auth/
-|   |   |   +-- operator/
-|   |   |   +-- supervisor/
-|   |   |   +-- teamlead/
-|   |   +-- routes/                  # Route configurations
-|   |   +-- ... (other assets)
-|   +-- ... (other root frontend files)
-|
-+-- myenv/                           # Python virtual environment (gitignored)
-|
-+-- src/                             # Backend FastAPI Application
-|   +-- .env                         # Environment variables (local, gitignored)
-|   +-- .gitignore                   # Backend specific gitignore
-|   +-- api/                         # API logic
-|   |   +-- crud.py                  # CRUD operations for database models
-|   |   +-- database.py              # Database connection setup (SQLAlchemy)
-|   |   +-- models.py                # SQLAlchemy ORM models
-|   |   +-- schemas.py               # Pydantic schemas
-|   |   +-- utils.py                 # Utility functions (auth, hashing)
-|   +-- network/                     # Network utilities
-|   |   +-- ssh_client.py            # SSH client for command execution
-|   |   +-- scanner.py               # Network scanning functions
-|   +-- main.py                      # FastAPI application entry point
-|   +-- requirements.txt             # Backend Python dependencies
-|   +-- app.py                       # (Potentially an older/alternative entry point)
-|
-+-- .gitignore                       # Root gitignore file for the project
-+-- README.md                        # This file
-
+├── docker_linux_machine/       # Docker setup for test Linux SSH environments
+│   ├── docker-compose.yml      # Defines services like ubuntu1, ubuntu2, alpine1
+│   └── Dockerfile              # Dockerfile for Ubuntu SSH server image
+│
+├── Frontend/                   # React Frontend Application (Vite based)
+│   ├── .env                    # Environment variables (local, gitignored)
+│   ├── .env copy FE            # Example environment variables for Frontend
+│   ├── .github/                # GitHub specific files (workflows, issue templates)
+│   ├── .gitignore              # Frontend specific gitignore
+│   ├── package.json            # Frontend dependencies and scripts
+│   ├── vite.config.mjs         # Vite configuration
+│   └── src/                    # Frontend source code
+│       ├── App.jsx             # Main application component with routing
+│       ├── api/                # API interaction services
+│       ├── components/         # Reusable UI components
+│       ├── menu-items/         # Definitions for navigation menus
+│       ├── pages/              # Page components
+│       │   ├── admin/
+│       │   ├── auth/
+│       │   ├── operator/
+│       │   ├── supervisor/
+│       │   └── teamlead/
+│       └── routes/             # Route configurations
+│
+├── myenv/                      # Python virtual environment (gitignored)
+│
+├── src/                        # Backend FastAPI Application
+│   ├── .env                    # Environment variables (local, gitignored)
+│   ├── .gitignore              # Backend specific gitignore
+│   ├── api/                    # API logic
+│   │   ├── crud.py             # CRUD operations for database models
+│   │   ├── database.py         # Database connection setup (SQLAlchemy)
+│   │   ├── models.py           # SQLAlchemy ORM models
+│   │   ├── schemas.py          # Pydantic schemas
+│   │   └── utils.py            # Utility functions (auth, hashing)
+│   ├── network/                # Network utilities
+│   │   ├── ssh_client.py       # SSH client for command execution
+│   │   └── scanner.py          # Network scanning functions
+│   ├── main.py                 # FastAPI application entry point
+│   ├── requirements.txt        # Backend Python dependencies
+│   └── app.py                  # (Potentially an older/alternative entry point)
+│
+├── .gitignore                  # Root gitignore file for the project
+└── README.md                   # This file
 ## Features
 
 *   **User Authentication & Authorization:**
