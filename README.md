@@ -52,6 +52,7 @@ wifi-hub-scan-docker/
 │
 ├── .gitignore                  # Root gitignore file for the project
 └── README.md                   # This file
+
 ```
 
 ## Features
