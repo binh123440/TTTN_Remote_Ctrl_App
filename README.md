@@ -5,6 +5,7 @@
 This project is a comprehensive Wi-Fi Hub Management System featuring a FastAPI backend and a React (Vite + Material UI) frontend. It allows for device management, SSH command execution (via HTTP and a real-time WebSocket terminal), user role management (operator, supervisor, admin, team_lead), session tracking, command logging, and network scanning capabilities.
 
 ## Project Structure
+
 wifi-hub-scan-docker/
 ├── docker_linux_machine/       # Docker setup for test Linux SSH environments
 │   ├── docker-compose.yml      # Defines services like ubuntu1, ubuntu2, alpine1
@@ -50,6 +51,7 @@ wifi-hub-scan-docker/
 │
 ├── .gitignore                  # Root gitignore file for the project
 └── README.md                   # This file
+
 ## Features
 
 *   **User Authentication & Authorization:**
