@@ -7,6 +7,7 @@ from .models import User, Device, DeviceGroup, CommandList, Profile, UserProfile
 
 from datetime import datetime, timedelta
 
+
 from api import models
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -529,4 +530,12 @@ def get_unique_devices_from_logs(db: Session) -> List[models.Device]:
     devices = db.query(models.Device).filter(models.Device.id.in_(logged_device_ids)).all()
     return devices
 
+
+def update_log_result(db, log_id, result):
+    log = db.query(models.Log).filter(models.Log.id == log_id).first()
+    if log:
+        log.result = result
+        db.commit()
+        db.refresh(log)
+    return log
 

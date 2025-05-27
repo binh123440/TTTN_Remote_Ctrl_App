@@ -1102,11 +1102,13 @@ def get_session_history(
         device_name = None
         device_type_val = None # Đổi tên biến để tránh xung đột với tên trường
         device_ip = None
+        device_port_val = None # Đổi tên biến để tránh xung đột với tên trường
 
         if session_db.device:
             device_name = session_db.device.controlled_feature # Sử dụng controlled_feature làm device_name
             device_type_val = session_db.device.device_type
             device_ip = session_db.device.ip_address
+            device_port_val = session_db.device.port
 
         response_sessions.append(
             schemas.Session(
@@ -1119,7 +1121,8 @@ def get_session_history(
                 operator_username=session_db.operator.username if session_db.operator else "N/A",
                 device_ip_address=device_ip if device_ip else "N/A",
                 device_name=device_name if device_name else (device_ip if device_ip else "N/A"), # Fallback cho device_name
-                device_type=device_type_val if device_type_val else "Unknown" # Fallback cho device_type
+                device_type=device_type_val if device_type_val else "Unknown", # Fallback cho device_type
+                device_port=device_port_val
             )
         )
     return response_sessions
@@ -1326,88 +1329,90 @@ def disconnect_session(
         }
     }
 
-@app.get("/logs/commands", response_model=schemas.PaginatedLogResponse)
-def read_command_logs(
-    operator_id: Optional[int] = Query(None),
-    device_id: Optional[int] = Query(None),
-    filter_date: Optional[date] = Query(None), # THAY ĐỔI: từ start_date, end_date thành filter_date
-    sort_by: Optional[str] = Query("timestamp"),
-    sort_order: Optional[str] = Query("desc"),
-    limit: int = Query(10, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if current_user.role not in ["supervisor", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only supervisors or admins can view command logs"
-        )
+# @app.get("/logs/commands", response_model=schemas.PaginatedLogResponse)
+# def read_command_logs(
+#     operator_id: Optional[int] = Query(None),
+#     device_id: Optional[int] = Query(None),
+#     filter_date: Optional[date] = Query(None), # THAY ĐỔI: từ start_date, end_date thành filter_date
+#     sort_by: Optional[str] = Query("timestamp"),
+#     sort_order: Optional[str] = Query("desc"),
+#     limit: int = Query(10, ge=1, le=100),
+#     offset: int = Query(0, ge=0),
+#     db: Session = Depends(get_db),
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     if current_user.role not in ["supervisor", "admin"]:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="Only supervisors or admins can view command logs"
+#         )
 
-    actual_start_date: Optional[datetime] = None
-    actual_end_date: Optional[datetime] = None
+#     actual_start_date: Optional[datetime] = None
+#     actual_end_date: Optional[datetime] = None
 
-    if filter_date:
-        actual_start_date = datetime.combine(filter_date, time.min)
-        actual_end_date = datetime.combine(filter_date, time.max)
+#     if filter_date:
+#         actual_start_date = datetime.combine(filter_date, time.min)
+#         actual_end_date = datetime.combine(filter_date, time.max)
     
-    logs_db = crud.get_command_logs(
-        db, 
-        operator_id=operator_id, 
-        device_id=device_id, 
-        start_date=actual_start_date, # SỬ DỤNG: actual_start_date
-        end_date=actual_end_date,   # SỬ DỤNG: actual_end_date
-        sort_by=sort_by, 
-        sort_order=sort_order,
-        limit=limit,
-        offset=offset
-    )
+#     logs_db = crud.get_command_logs(
+#         db, 
+#         operator_id=operator_id, 
+#         device_id=device_id, 
+#         start_date=actual_start_date, # SỬ DỤNG: actual_start_date
+#         end_date=actual_end_date,   # SỬ DỤNG: actual_end_date
+#         sort_by=sort_by, 
+#         sort_order=sort_order,
+#         limit=limit,
+#         offset=offset
+#     )
     
-    total_logs = crud.get_command_logs_count(
-        db,
-        operator_id=operator_id, 
-        device_id=device_id, 
-        start_date=actual_start_date, # SỬ DỤNG: actual_start_date
-        end_date=actual_end_date    # SỬ DỤNG: actual_end_date
-    )
+#     total_logs = crud.get_command_logs_count(
+#         db,
+#         operator_id=operator_id, 
+#         device_id=device_id, 
+#         start_date=actual_start_date, # SỬ DỤNG: actual_start_date
+#         end_date=actual_end_date    # SỬ DỤNG: actual_end_date
+#     )
     
-    response_items = []
-    for log_item in logs_db:
-        device_name_val = "Unknown"
-        device_ip_val = "Unknown"
-        device_type_val = None
+#     response_items = []
+#     for log_item in logs_db:
+#         device_name_val = "Unknown"
+#         device_ip_val = "Unknown"
+#         device_type_val = None
 
-        if log_item.device:
-            if hasattr(log_item.device, 'name') and log_item.device.name:
-                device_name_val = log_item.device.name
-            elif hasattr(log_item.device, 'controlled_feature') and log_item.device.controlled_feature:
-                device_name_val = log_item.device.controlled_feature
-            elif hasattr(log_item.device, 'ip_address'):
-                device_name_val = log_item.device.ip_address
+#         if log_item.device:
+#             if hasattr(log_item.device, 'name') and log_item.device.name:
+#                 device_name_val = log_item.device.name
+#             elif hasattr(log_item.device, 'controlled_feature') and log_item.device.controlled_feature:
+#                 device_name_val = log_item.device.controlled_feature
+#             elif hasattr(log_item.device, 'ip_address'):
+#                 device_name_val = log_item.device.ip_address
             
-            if hasattr(log_item.device, 'ip_address'):
-                device_ip_val = log_item.device.ip_address
+#             if hasattr(log_item.device, 'ip_address'):
+#                 device_ip_val = log_item.device.ip_address
             
-            if hasattr(log_item.device, 'device_type'):
-                device_type_val = log_item.device.device_type 
+#             if hasattr(log_item.device, 'device_type'):
+#                 device_type_val = log_item.device.device_type 
             
-        current_device_id = log_item.device_id if log_item.device_id is not None else 0
-
-        response_items.append(
-            schemas.LogResponse(
-                id=log_item.id,
-                user_id=log_item.user_id,
-                operator_username=log_item.user.username if log_item.user else "Unknown",
-                device_id=current_device_id, 
-                device_ip_address=device_ip_val,
-                device_name=device_name_val,
-                device_type=device_type_val,
-                command=log_item.command,
-                result=log_item.result,
-                timestamp=log_item.timestamp
-            )
-        )
-    return schemas.PaginatedLogResponse(items=response_items, total=total_logs)
+#         current_device_id = log_item.device_id if log_item.device_id is not None else 0
+#         current_device_port = log_item.device.port if log_item.device and log_item.device.port else None
+        
+#         response_items.append(
+#             schemas.LogResponse(
+#                 id=log_item.id,
+#                 user_id=log_item.user_id,
+#                 operator_username=log_item.user.username if log_item.user else "Unknown",
+#                 device_id=current_device_id, 
+#                 device_ip_address=device_ip_val,
+#                 device_name=device_name_val,
+#                 device_type=device_type_val,
+#                 command=log_item.command,
+#                 result=log_item.result,
+#                 timestamp=log_item.timestamp,
+#                 device_port=current_device_port
+#             )
+#         )
+#     return schemas.PaginatedLogResponse(items=response_items, total=total_logs)
 
 @app.get("/logs/commands", response_model=schemas.PaginatedLogResponse)
 def read_command_logs(
@@ -1459,7 +1464,8 @@ def read_command_logs(
                 device_ip_address=log_entry.device.ip_address if log_entry.device else "Unknown",
                 command=log_entry.command,
                 result=log_entry.result,
-                timestamp=log_entry.timestamp
+                timestamp=log_entry.timestamp,
+                device_port=log_entry.device.port if log_entry.device else None,
             )
         )
     return schemas.PaginatedLogResponse(items=response_logs, total=total_logs)
@@ -1526,6 +1532,7 @@ def get_all_devices_with_logs_for_filter(
             schemas.DeviceFilterItem( # Sử dụng lại schema DeviceFilterItem nếu phù hợp
                 id=dev_db.id,
                 ip_address=dev_db.ip_address, 
+                port=dev_db.port,
                 name=device_name_val,
                 device_type=device_type_val
             )
@@ -1533,11 +1540,29 @@ def get_all_devices_with_logs_for_filter(
     return response_devices
 
 @app.websocket("/ws/ssh")
-async def websocket_ssh_endpoint(websocket: WebSocket):
+async def websocket_ssh_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     ssh_client = None
     channel = None
     output_task = None
+    command_buffer = ""
+    waiting_log_id = None
+    current_command_output = ""
+
+    # --- Lấy access_token từ query param ---
+    token = websocket.query_params.get("access_token")
+    current_user = None
+    if token:
+        # Tái sử dụng logic get_current_user
+        username = decode_token(token)
+        if username:
+            user = crud.get_user_by_username(db, username)
+            if user and (user.role != "operator" or (crud.get_active_session_by_operator(db, user.id) and crud.get_active_session_by_operator(db, user.id).status == "active")):
+                current_user = user
+    if not current_user:
+        await websocket.send_text("[ERROR] Authentication failed or session inactive.")
+        await websocket.close(code=4003)
+        return
 
     try:
         # Nhận thông tin kết nối ban đầu từ client
@@ -1586,12 +1611,16 @@ async def websocket_ssh_endpoint(websocket: WebSocket):
         await websocket.send_text("[INFO] Connected to remote shell.\r\n")
 
         async def read_from_channel():
+            nonlocal current_command_output, waiting_log_id
             try:
                 while True:
                     if channel.recv_ready():
                         data = channel.recv(4096)
                         if data:
-                            await websocket.send_text(data.decode(errors="replace")) # errors='replace' để tránh lỗi decode
+                            decoded = data.decode(errors="replace")
+                            await websocket.send_text(decoded) # errors='replace' để tránh lỗi decode
+                            if waiting_log_id:
+                                current_command_output += decoded
                         else: # Channel closed by server
                             break 
                     elif channel.exit_status_ready(): # Shell đã thoát
@@ -1608,20 +1637,48 @@ async def websocket_ssh_endpoint(websocket: WebSocket):
 
         output_task = asyncio.create_task(read_from_channel())
 
-        # Vòng lặp nhận lệnh từ client và gửi tới shell
+        # Vòng lặp nhận lệnh từ client và gửi tới shell 
         while True:
             client_data_raw = await websocket.receive_text()
             try:
-                # Kiểm tra xem có phải là JSON message (vd: resize) không
                 client_message = json.loads(client_data_raw)
                 if isinstance(client_message, dict) and client_message.get("type") == "resize":
                     cols = client_message.get("cols")
                     rows = client_message.get("rows")
                     if cols and rows and channel:
                         channel.resize_pty(width=cols, height=rows)
-            except json.JSONDecodeError: # Nếu không phải JSON, đó là input thông thường
-                 if channel and channel.send_ready():
+            except json.JSONDecodeError:
+                if channel and channel.send_ready():
                     channel.send(client_data_raw)
+                    # Xử lý từng ký tự để hỗ trợ Backspace
+                    for c in client_data_raw:
+                        if c in ('\x08', '\x7f'):  # Backspace hoặc DEL
+                            command_buffer = command_buffer[:-1]
+                        else:
+                            command_buffer += c
+                    # Nếu gặp Enter (\n hoặc \r), mới log
+                    if "\n" in client_data_raw or "\r" in client_data_raw:
+                        command_to_log = command_buffer.strip()
+                        if command_to_log:
+                            device = crud.get_device_by_ip(db, host)
+                            log = crud.create_log(
+                                db,
+                                user_id=current_user.id,
+                                device_id=device.id if device else None,
+                                command=utils.clean_text(command_to_log),
+                                result=""
+                            )
+                            waiting_log_id = log.id if log else None
+                            current_command_output = ""  # Reset output buffer
+                        command_buffer = ""  # Reset buffer sau khi log
+                    # Nếu vừa gửi Enter, đợi một chút rồi cập nhật result
+                    if waiting_log_id:
+                        await asyncio.sleep(0.5)  # Đợi output về (có thể tăng lên nếu cần)
+                        raw_result = current_command_output
+                        cleaned_result = utils.clean_text(utils.remove_shell_prompt(raw_result))
+                        crud.update_log_result(db, waiting_log_id, cleaned_result)
+                        waiting_log_id = None
+                        current_command_output = ""  # Reset output buffer
 
 
     except WebSocketDisconnect as e: # Thêm 'as e' để có thể truy cập mã lỗi

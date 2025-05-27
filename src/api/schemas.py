@@ -193,6 +193,7 @@ class Session(BaseModel):
     ended_at: Optional[datetime] = None
     operator_username: Optional[str] = None
     device_ip_address: Optional[str] = None
+    device_port: Optional[int] = None
     device_type: Optional[str] = None  # Thêm dòng này
 
     class Config:
@@ -208,6 +209,7 @@ class LogResponse(BaseModel):
     operator_username: Optional[str] = "Unknown"
     device_id: int # Hoặc Optional[int] nếu device_id có thể null trong bảng logs
     device_ip_address: Optional[str] = "Unknown"
+    device_port: Optional[str] = None
     device_type: Optional[str] = None # QUAN TRỌNG: Phải là Optional[str]
     command: str
     result: str
@@ -223,6 +225,7 @@ class PaginatedLogResponse(BaseModel):
 class DeviceFilterItem(BaseModel):
     id: int
     ip_address: str
+    port: str
     name: Optional[str] = None       # Tên thiết bị (có thể là controlled_feature)
     device_type: Optional[str] = None # Loại thiết bị
 

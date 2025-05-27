@@ -1,3 +1,6 @@
+import re
+import string
+
 def format_ip(ip):
     parts = ip.split('.')
     if len(parts) != 4:

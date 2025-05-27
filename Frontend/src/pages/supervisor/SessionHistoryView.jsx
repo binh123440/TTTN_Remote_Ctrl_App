@@ -237,6 +237,14 @@ const SessionHistoryView = () => {
           {tabValue === 0 && !loading && (
             <TableContainer component={Paper}>
               <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Operator</TableCell>
+                    <TableCell>Device</TableCell>
+                    <TableCell>Started At</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
                 <TableBody>
                   {sessions.filter(s => s.status === 'active').length > 0 ? (
                     sessions.filter(s => s.status === 'active').map((session) => (
@@ -244,13 +252,12 @@ const SessionHistoryView = () => {
                         <TableCell>{session.operator_username || operators.find(op => op.id === session.operator_id)?.username || 'Unknown'}</TableCell>
                         <TableCell>
                           {session.device_name || session.device_ip_address || 'N/A'}
-                          {session.device_type && ` (${session.device_type})`}
+                          {session.device_port && ` (${session.device_port})`}
                         </TableCell>
                         <TableCell>{new Date(session.started_at).toLocaleString()}</TableCell>
                         <TableCell align="right">
                           <Button 
-                            color="error"
-                            size="small"
+                            variant="contained" color="error" size="small"
                             onClick={() => handleOpenDialog(operators.find(op => op.id === session.operator_id) || {id: session.operator_id, username: session.operator_username})}
                           >
                             Terminate
@@ -286,7 +293,7 @@ const SessionHistoryView = () => {
                         <TableCell>{session.operator_username || operators.find(op => op.id === session.operator_id)?.username || 'Unknown'}</TableCell>
                         <TableCell>
                           {session.device_name || session.device_ip_address || 'N/A'}
-                          {session.device_type && ` (${session.device_type})`}
+                          {session.device_port && ` (${session.device_port})`}
                         </TableCell>
                         <TableCell>{new Date(session.started_at).toLocaleString()}</TableCell>
                         <TableCell>{session.ended_at ? new Date(session.ended_at).toLocaleString() : '-'}</TableCell>
@@ -335,7 +342,7 @@ const SessionHistoryView = () => {
                         allLogDevicesForFilter.map((dev) => (
                           <MenuItem key={dev.id} value={dev.id}>
                             { dev.ip_address || `Device ID: ${dev.id}`} 
-                            {dev.device_type ? ` (${dev.device_type})` : ' (Unknown Type)'}
+                            {dev.port ? ` (${dev.port})` : ' (Unknown Type)'}
                           </MenuItem>
                         ))
                       ) : (
@@ -396,7 +403,7 @@ const SessionHistoryView = () => {
                               <TableCell>{log.operator_username}</TableCell>
                               <TableCell>
                                 {log.device_name || log.device_ip_address || 'Unknown'}
-                                {log.device_type && ` (${log.device_type})`}
+                                {log.device_port && ` (${log.device_port})`}
                               </TableCell>
                               <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 <Tooltip title={<pre style={{whiteSpace: 'pre-wrap', margin:0, maxWidth: 400}}>{log.command}</pre>} placement="top-start"><Box component="span">{log.command}</Box></Tooltip>

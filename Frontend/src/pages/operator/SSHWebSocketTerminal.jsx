@@ -1,4 +1,3 @@
-// filepath: Frontend/src/pages/operator/SSHWebSocketTerminal.jsx
 import { useState, useEffect, useRef } from 'react';
 import {
   Box,
@@ -16,11 +15,14 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import axios from 'axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
+import { useNavigate } from 'react-router-dom';
 
 const SSHWebSocketTerminal = () => {
   const [activeStep, setActiveStep] = useState(0);
@@ -32,6 +34,13 @@ const SSHWebSocketTerminal = () => {
   const [error, setError] = useState('');
   const [isRawMode, setIsRawMode] = useState(true);
 
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+
   const terminalRef = useRef(null);
   const term = useRef(null);
   const fitAddon = useRef(null);
@@ -40,6 +49,83 @@ const SSHWebSocketTerminal = () => {
 
   const token = localStorage.getItem('accessToken');
   const steps = ['Select Device', 'Enter Credentials', 'Open Terminal'];
+  const navigate = useNavigate();
+
+  // --- SESSION MANAGEMENT LOGIC ---
+
+  // Check session status every 10s when in terminal step
+  useEffect(() => {
+    const sessionCheckInterval = setInterval(() => {
+      if (activeStep === 2) {
+        checkSessionStatus();
+      }
+    }, 10000);
+    return () => clearInterval(sessionCheckInterval);
+  }, [activeStep]);
+
+  // Check session status
+  const checkSessionStatus = async () => {
+    try {
+      const currentToken = localStorage.getItem('accessToken');
+      if (!currentToken) return;
+      const response = await axios.get('http://localhost:8000/session/current', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      if (!response.data || !response.data.session || response.data.session.status !== 'active') {
+        handleSessionKilled();
+      }
+    } catch (err) {
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+        handleSessionKilled();
+      }
+    }
+  };
+
+  // Check session before sensitive actions
+  const checkSessionBeforeAction = async () => {
+    try {
+      const currentToken = localStorage.getItem('accessToken');
+      if (!currentToken) {
+        handleSessionKilled();
+        return false;
+      }
+      const response = await axios.get('http://localhost:8000/session/current', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      });
+      if (!response.data || !response.data.session || response.data.session.status !== 'active') {
+        handleSessionKilled();
+        return false;
+      }
+      return true;
+    } catch (err) {
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+        handleSessionKilled();
+      }
+      return false;
+    }
+  };
+
+  // Handle session killed by supervisor
+  const handleSessionKilled = () => {
+    if (snackbar.open) return;
+    setSnackbar({
+      open: true,
+      message: 'Phiên làm việc của bạn đã bị kết thúc bởi người giám sát',
+      severity: 'error'
+    });
+    setTimeout(() => {
+      localStorage.removeItem('accessToken');
+      navigate('/login');
+    }, 3000);
+  };
+
+  // Close snackbar
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // --- END SESSION MANAGEMENT LOGIC ---
 
   useEffect(() => {
     fetchDevices();
@@ -56,7 +142,6 @@ const SSHWebSocketTerminal = () => {
 
   // Initialize terminal AND connect WebSocket when activeStep is 2 and all details are present
   useEffect(() => {
-    // Chỉ thực hiện nếu đang ở bước 2, có DOM ref, và chưa có instance terminal
     if (activeStep === 2 && terminalRef.current && !term.current) {
       console.log("Initializing terminal...");
       term.current = new Terminal({
@@ -108,26 +193,26 @@ const SSHWebSocketTerminal = () => {
       const handleResize = () => {
         if (fitAddon.current) fitAddon.current.fit();
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && term.current) {
-            const dimensions = fitAddon.current.proposeDimensions();
-            if (dimensions) {
-                socketRef.current.send(JSON.stringify({
-                    type: 'resize',
-                    cols: dimensions.cols,
-                    rows: dimensions.rows
-                }));
-            }
+          const dimensions = fitAddon.current.proposeDimensions();
+          if (dimensions) {
+            socketRef.current.send(JSON.stringify({
+              type: 'resize',
+              cols: dimensions.cols,
+              rows: dimensions.rows
+            }));
+          }
         }
       };
       window.addEventListener('resize', handleResize);
       setTimeout(() => handleResize(), 100); // Initial fit
 
-      // --- LOGIC KẾT NỐI WEBSOCKET ĐƯỢC CHUYỂN VÀO ĐÂY ---
+      // --- LOGIC KẾT NỐI WEBSOCKET ---
       if (selectedDeviceObj && selectedDeviceObj.ip_address && username && password) {
         console.log("Attempting WebSocket connection...");
         term.current.writeln('Attempting to connect...');
 
-        const ws = new WebSocket('ws://localhost:8000/ws/ssh');
-        socketRef.current = ws; // Gán socketRef ngay khi tạo
+        const ws = new WebSocket('ws://localhost:8000/ws/ssh?access_token=' + token);
+        socketRef.current = ws;
 
         ws.onopen = () => {
           term.current.writeln('\r\n[WebSocket connected]\r\n');
@@ -157,7 +242,6 @@ const SSHWebSocketTerminal = () => {
           if (term.current) {
             term.current.writeln(`\r\n[Disconnected. Code: ${closeEvent.code}, Reason: ${closeEvent.reason || 'N/A'}]\r\n`);
           }
-          // Không tự động quay lại bước trước, để người dùng nhấn nút "Back" hoặc "Disconnect"
         };
       } else {
         console.warn("Missing connection details for WebSocket:", {selectedDeviceObj, username, password});
@@ -169,7 +253,7 @@ const SSHWebSocketTerminal = () => {
       return () => {
         console.log("Cleaning up terminal and WebSocket...");
         window.removeEventListener('resize', handleResize);
-        if (socketRef.current) { // Đóng WebSocket trước
+        if (socketRef.current) {
           socketRef.current.close();
           socketRef.current = null;
         }
@@ -177,14 +261,13 @@ const SSHWebSocketTerminal = () => {
           term.current.dispose();
           term.current = null;
         }
-        fitAddon.current = null; // Dọn dẹp fitAddon
-        inputBufferRef.current = ''; // Reset input buffer
+        fitAddon.current = null;
+        inputBufferRef.current = '';
       };
     }
-  }, [activeStep, isRawMode, selectedDeviceObj, username, password]); // Thêm selectedDeviceObj, username, password vào dependencies
+  }, [activeStep, isRawMode, selectedDeviceObj, username, password]);
 
   const fetchDevices = async () => {
-    // ... (giữ nguyên)
     try {
       const response = await axios.get('http://localhost:8000/devices', {
         headers: { Authorization: `Bearer ${token}` }
@@ -206,8 +289,24 @@ const SSHWebSocketTerminal = () => {
     }
   };
 
-  const handleNext = () => {
+  const updateSessionDeviceId = async (deviceId) => {
+    try {
+      await axios.put(
+        'http://localhost:8000/session/update-device',
+        { device_id: deviceId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log('Session updated with device ID:', deviceId);
+    } catch (err) {
+      console.error('Failed to update session device ID:', err, deviceId);
+    }
+  };
+
+  // Sử dụng kiểm tra session trước khi chuyển bước
+  const handleNext = async () => {
     setError('');
+    if (!(await checkSessionBeforeAction())) return;
+
     if (activeStep === 0 && !selectedDevice) {
       setError('Please select a device');
       return;
@@ -216,42 +315,44 @@ const SSHWebSocketTerminal = () => {
       setError('Please enter both username and password');
       return;
     }
-    
-    // Chỉ chuyển step, useEffect sẽ lo việc kết nối khi activeStep là 2
+
+    if (activeStep === 0) {
+      try {
+        await updateSessionDeviceId(selectedDevice);
+      } catch (err) {
+        setError('Failed to update session device. Please try again.');
+        return;
+      }
+    }
+
     if (activeStep < 2) {
-        if (activeStep === 1 && term.current) { // Nếu quay lại từ step 2 rồi lên lại
-            term.current.clear(); // Xóa terminal cũ trước khi setup lại
-        }
-        setActiveStep(prev => prev + 1);
+      if (activeStep === 1 && term.current) {
+        term.current.clear();
+      }
+      setActiveStep(prev => prev + 1);
     }
   };
 
   const handleBack = () => {
     setError('');
     if (activeStep === 2) {
-        // useEffect cleanup sẽ tự động đóng WebSocket và dispose terminal
-        // khi activeStep thay đổi
+      // useEffect cleanup sẽ tự động đóng WebSocket và dispose terminal
     }
     if (activeStep > 0) {
       setActiveStep(prev => prev - 1);
     }
   };
 
-  // handleConnect không còn cần thiết nữa vì logic đã chuyển vào useEffect
-  // const handleConnect = () => { ... };
-
-  const handleDisconnect = () => {
-    // useEffect cleanup sẽ xử lý việc đóng socket và dispose terminal khi activeStep thay đổi
-    // Nút này chủ yếu để người dùng chủ động ngắt kết nối và có thể quay lại bước trước
+  // Sử dụng kiểm tra session trước khi disconnect
+  const handleDisconnect = async () => {
+    if (!(await checkSessionBeforeAction())) return;
     if (socketRef.current) {
-      socketRef.current.close(); // Chủ động đóng socket
-      // socketRef.current = null; // Cleanup trong useEffect sẽ làm điều này
+      socketRef.current.close();
     }
     if (term.current) {
-        term.current.writeln("\r\n[INFO] Disconnecting by user request...\r\n");
+      term.current.writeln("\r\n[INFO] Disconnecting by user request...\r\n");
     }
-    // Có thể quay lại bước 1 hoặc 0 tùy ý
-    // setActiveStep(1);
+    // setActiveStep(1); // Nếu muốn quay lại bước trước
     // setError('');
   };
 
@@ -281,7 +382,6 @@ const SSHWebSocketTerminal = () => {
                   label="Device"
                 >
                   {devices.map(device => (
-                    // Giả sử device object có id, ip_address, và port
                     <MenuItem key={device.id} value={device.id}>
                       {device.ip_address} (Port: {device.port || 'N/A'})
                     </MenuItem>
@@ -313,7 +413,6 @@ const SSHWebSocketTerminal = () => {
               />
               <Box mt={2} display="flex" gap={2}>
                 <Button variant="outlined" onClick={handleBack}>Back</Button>
-                {/* Nút này giờ chỉ gọi handleNext để chuyển step */}
                 <Button variant="contained" onClick={handleNext} disabled={!username || !password}>
                   Open Terminal
                 </Button>
@@ -329,16 +428,15 @@ const SSHWebSocketTerminal = () => {
               <Box
                 ref={terminalRef}
                 sx={{
-                  bgcolor: '#000', // Màu nền của terminal
-                  color: '#0f0',   // Màu chữ của terminal
-                  height: 400,    // Chiều cao của terminal
+                  bgcolor: '#000',
+                  color: '#0f0',
+                  height: 400,
                   borderRadius: 1,
-                  border: '1px solid #ccc', // Thêm border để dễ nhìn
-                  // boxShadow: '0 0 10px #0f0', // Hiệu ứng đổ bóng nếu muốn
+                  border: '1px solid #ccc',
                   fontFamily: 'monospace',
                   fontSize: 14,
-                  overflow: 'hidden', // Quan trọng để FitAddon hoạt động đúng
-                  p: 1 // Padding nhỏ bên trong
+                  overflow: 'hidden',
+                  p: 1
                 }}
               />
               <Box mt={2} display="flex" justifyContent="space-between" alignItems="center">
@@ -364,6 +462,22 @@ const SSHWebSocketTerminal = () => {
           )}
         </CardContent>
       </Card>
+      {/* Snackbar for session events */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

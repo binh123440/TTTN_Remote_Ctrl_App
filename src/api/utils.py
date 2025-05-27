@@ -3,6 +3,8 @@ import random
 import os
 from dotenv import load_dotenv
 import bcrypt
+import re
+import string
 
 load_dotenv()
 
@@ -34,3 +36,16 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Kiểm tra mật khẩu đã băm."""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def clean_text(text: str) -> str:
+    # Loại bỏ escape sequences ANSI (màu sắc, clear, ... của terminal)
+    text = re.sub(r'\x1B[@-_][0-?]*[ -/]*[@-~]', '', text)
+    # Loại bỏ ký tự không in được (non-printable)
+    text = ''.join(c for c in text if c in string.printable)
+    # Loại bỏ khoảng trắng đầu/cuối và thay nhiều khoảng trắng liên tiếp bằng 1 space
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def remove_shell_prompt(text: str) -> str:
+    # Loại bỏ các dòng giống prompt kiểu user@host:~$
+    return re.sub(r'^[\w\-]+@[\w\-]+:[~\w\/\-\.\d]*\$ ?', '', text, flags=re.MULTILINE)
