@@ -1660,7 +1660,7 @@ async def websocket_ssh_endpoint(websocket: WebSocket, db: Session = Depends(get
                     if "\n" in client_data_raw or "\r" in client_data_raw:
                         command_to_log = command_buffer.strip()
                         if command_to_log:
-                            device = crud.get_device_by_ip(db, host)
+                            device = crud.get_device_by_port(db, port)
                             log = crud.create_log(
                                 db,
                                 user_id=current_user.id,

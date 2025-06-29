@@ -131,6 +131,9 @@ def get_device(db: Session, device_id: int):
 def get_device_by_ip(db: Session, ip_address: str):
     return db.query(Device).filter(Device.ip_address == ip_address).first()
 
+def get_device_by_port(db: Session, port):
+    return db.query(Device).filter(Device.port == str(port)).first()
+
 def get_device_by_username(db: Session, username: str):
     return db.query(Device).filter(Device.username == username).first()
 
