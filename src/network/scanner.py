@@ -8,6 +8,8 @@ import concurrent.futures
 import time
 import json
 
+import psutil
+
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -209,6 +211,27 @@ def get_hotspot_devices():
     
     return devices
 
+def scan_all_networks():
+    subnets = []
+    for iface, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == 2:  # AF_INET
+                ip = addr.address
+                netmask = addr.netmask
+                if ip and netmask and not ip.startswith("127."):
+                    try:
+                        network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+                        subnets.append(str(network))
+                    except Exception:
+                        pass
+
+    all_devices = []
+    for subnet in subnets:
+        base_ip = str(subnet).rsplit('.', 1)[0]
+        devices = scan_network(base_ip)
+        all_devices.extend(devices)
+    return all_devices
+
 def scan_docker_containers():
     """
     Scan for Docker containers with specific focus on Linux VMs with SSH access
@@ -367,6 +390,135 @@ def scan_docker_containers():
             "hostname": "N/A", 
             "status": f"Error scanning Docker: {str(e)}",
             "container_name": "N/A",
+            "open_ports": []
+        })
+    
+    return devices
+
+def get_all_adapter_devices():
+    """
+    Quét tất cả các IP của các network adapter (bao gồm cả VMnet1, VMnet8, Ethernet, Wi-Fi, ...)
+    Giữ lại logic quét hotspot, bổ sung quét subnet của mọi adapter.
+    """
+    import psutil
+    import ipaddress
+
+    devices = []
+    common_ports = [22, 23, 80, 443, 8080, 21, 25, 3389]
+
+    try:
+        # --- Quét Mobile Hotspot như cũ ---
+        ipconfig = subprocess.check_output('ipconfig /all', shell=True).decode('utf-8', errors='ignore')
+        mobile_adapters = [
+            "Mobile Hotspot",
+            "Local Area Connection* ",
+            "Microsoft Wi-Fi Direct Virtual Adapter",
+            "Wireless LAN"
+        ]
+        hotspot_ip = None
+        for adapter in mobile_adapters:
+            matches = re.findall(rf'{adapter}.*?IPv4 Address[.\s]*: ([\d.]+)', ipconfig, re.DOTALL | re.IGNORECASE)
+            if matches:
+                hotspot_ip = matches[0]
+                break
+        if not hotspot_ip:
+            common_ips = [r'192\.168\.137\.\d+', r'172\.20\.10\.\d+', r'192\.168\.\d+\.\d+']
+            for pattern in common_ips:
+                matches = re.findall(pattern, ipconfig)
+                if matches:
+                    hotspot_ip = matches[0]
+                    break
+        if hotspot_ip:
+            arp_output = subprocess.check_output('arp -a', shell=True).decode('utf-8', errors='ignore')
+            ip_parts = hotspot_ip.split('.')
+            subnet_prefix = '.'.join(ip_parts[0:3]) + '.'
+            device_list = []
+            for line in arp_output.splitlines():
+                if subnet_prefix in line:
+                    parts = re.split(r'\s+', line.strip())
+                    if len(parts) >= 3:
+                        ip = parts[0]
+                        if ip == hotspot_ip:
+                            continue
+                        mac = parts[1]
+                        if mac == "ff-ff-ff-ff-ff-ff" or mac.count("-") != 5:
+                            continue
+                        try:
+                            hostname = get_hostname(ip)
+                        except:
+                            hostname = "Unknown"
+                        device_list.append({
+                            "ip": ip,
+                            "hostname": hostname,
+                            "status": "Connected",
+                            "mac": mac
+                        })
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_device = {
+                    executor.submit(scan_ports, device["ip"], common_ports): device
+                    for device in device_list
+                }
+                for future in concurrent.futures.as_completed(future_to_device):
+                    device = future_to_device[future]
+                    try:
+                        open_ports = future.result()
+                        device["open_ports"] = open_ports
+                        device["adapter"] = "Mobile Hotspot"
+                        devices.append(device)
+                    except Exception as exc:
+                        device["open_ports"] = []
+                        device["error"] = str(exc)
+                        device["adapter"] = "Mobile Hotspot"
+                        devices.append(device)
+            if not device_list:
+                devices.append({
+                    "ip": "N/A",
+                    "hostname": "N/A",
+                    "status": f"No devices found on hotspot network ({hotspot_ip})",
+                    "mac": "N/A",
+                    "open_ports": [],
+                    "adapter": "Mobile Hotspot"
+                })
+        else:
+            devices.append({
+                "ip": "N/A",
+                "hostname": "N/A",
+                "status": "Cannot detect Mobile Hotspot adapter",
+                "mac": "N/A",
+                "open_ports": [],
+                "adapter": "Mobile Hotspot"
+            })
+
+        # --- Quét tất cả các subnet của các adapter ---
+        subnets = []
+        for iface, addrs in psutil.net_if_addrs().items():
+            for addr in addrs:
+                if addr.family == 2:  # AF_INET
+                    ip = addr.address
+                    netmask = addr.netmask
+                    if ip and netmask and not ip.startswith("127."):
+                        try:
+                            network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+                            subnets.append((iface, str(network)))
+                        except Exception:
+                            pass
+
+        scanned_ips = set([d["ip"] for d in devices if d["ip"] != "N/A"])
+        for iface, subnet in subnets:
+            base_ip = subnet.rsplit('.', 1)[0]
+            # Tránh quét lại các IP đã biết
+            if base_ip in scanned_ips:
+                continue
+            devices_in_subnet = scan_network(base_ip)
+            devices.extend(devices_in_subnet)
+            scanned_ips.update([d["ip"] for d in devices_in_subnet if d["ip"] != "N/A"])
+        
+    except Exception as e:
+        devices.append({
+            "ip": "N/A", 
+            "hostname": "N/A", 
+            "status": f"Error: {str(e)}", 
+            "mac": "N/A",
             "open_ports": []
         })
     

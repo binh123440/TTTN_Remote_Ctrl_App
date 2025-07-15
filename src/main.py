@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
-from network.scanner import get_local_ip, scan_network, get_hotspot_devices
+from network.scanner import get_all_adapter_devices, get_local_ip, scan_network, get_hotspot_devices, scan_all_networks
 from network.ssh_client import execute_ssh_command
 from api import crud, models, schemas, utils
 from api.database import get_db, engine
@@ -1021,12 +1021,14 @@ def logout(
 def scan():
     local_ip = get_local_ip()
     base_ip = '.'.join(local_ip.split('.')[:3])
-    devices = scan_network(base_ip)
+    # devices = scan_network(base_ip)
+    devices = scan_all_networks()
     return devices
 
 @app.get("/hotspot")
 def hotspot_devices():
-    devices = get_hotspot_devices()
+    # devices = get_hotspot_devices()
+    devices = get_all_adapter_devices()
     return devices
 
 @app.get("/docker-linux")
@@ -1569,6 +1571,7 @@ async def websocket_ssh_endpoint(websocket: WebSocket, db: Session = Depends(get
         raw_data = await websocket.receive_text()
         try:
             init_data = json.loads(raw_data)
+            print(init_data)
         except json.JSONDecodeError:
             await websocket.send_text("[ERROR] Invalid JSON input for connection parameters.")
             await websocket.close(code=1008) # Policy Violation
@@ -1704,7 +1707,17 @@ async def websocket_ssh_endpoint(websocket: WebSocket, db: Session = Depends(get
             channel.close()
         if ssh_client:
             ssh_client.close()
-        # Đảm bảo websocket được đóng nếu chưa đóng
-        if websocket.client_state != WebSocketState.DISCONNECTED:
-             await websocket.close()
+        # Đảm bảo websocket được đóng nếu còn mở
+        try:
+            # Chỉ gọi close nếu websocket còn mở (CONNECTED)
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.close()
+        except RuntimeError as close_err:
+            # Bỏ qua lỗi "Cannot call 'send' once a close message has been sent."
+            if "Cannot call \"send\" once a close message has been sent." in str(close_err):
+                pass
+            else:
+                print(f"Error when closing websocket: {close_err}")
+        except Exception as close_err:
+            print(f"Error when closing websocket: {close_err}")
         print("SSH WebSocket connection closed.")
