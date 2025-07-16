@@ -13,3 +13,5 @@ bcrypt==4.3.0
 python-jose==3.4.0
 python-multipart==0.0.20
 uvicorn[standard]
+psutil
+pydantic[email]
